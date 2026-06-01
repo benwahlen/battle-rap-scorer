@@ -31,18 +31,31 @@ async function analyzeBattlecard(file: File): Promise<{
 }> {
   const base64 = await fileToBase64(file)
 
-  const res = await fetch('/api/analyze-battlecard', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ base64, mediaType: file.type }),
-  })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({})) as { error?: string }
-    throw new Error(err.error ?? `Fehler ${res.status}`)
+  let res: Response
+  try {
+    res = await fetch('/api/analyze-battlecard', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ base64, mediaType: file.type }),
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`Netzwerkfehler: ${msg} — Ist die App auf Vercel deployed?`)
   }
 
-  return res.json() as Promise<ReturnType<typeof analyzeBattlecard> extends Promise<infer T> ? T : never>
+  const text = await res.text()
+  let parsed: { error?: string; [key: string]: unknown }
+  try {
+    parsed = JSON.parse(text) as { error?: string; [key: string]: unknown }
+  } catch {
+    throw new Error(`Ungültige Server-Antwort (HTTP ${res.status}): ${text.slice(0, 120)}`)
+  }
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${parsed.error ?? text.slice(0, 120)}`)
+  }
+
+  return parsed as ReturnType<typeof analyzeBattlecard> extends Promise<infer T> ? T : never
 }
 
 export default function NewEvent({ onBack, onCreated }: Props) {
