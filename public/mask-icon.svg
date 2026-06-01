@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" fill="black">
+  <!-- Mic capsule -->
+  <rect x="72" y="28" width="48" height="72" rx="24" ry="24"/>
+  <!-- Bracket arms -->
+  <path d="M66 100 a30 30 0 0 0 60 0" fill="none" stroke="black" stroke-width="8" stroke-linecap="round"/>
+  <!-- Stand -->
+  <rect x="91" y="100" width="10" height="42"/>
+  <!-- Base -->
+  <rect x="66" y="142" width="60" height="10" rx="5"/>
+</svg>
