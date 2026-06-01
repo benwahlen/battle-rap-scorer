@@ -29,51 +29,20 @@ async function analyzeBattlecard(file: File): Promise<{
   date?: string
   battles?: { mc1: string; mc2: string; format: string }[]
 }> {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string
-  if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY nicht konfiguriert')
-
   const base64 = await fileToBase64(file)
-  const mediaType = file.type as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('/api/analyze-battlecard', {
     method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-client-side-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: base64 },
-            },
-            {
-              type: 'text',
-              text: 'Das ist eine Battle Rap Battlecard. Extrahiere: 1) Event-Name, 2) Ort/Stadt, 3) Datum falls sichtbar, 4) alle Battles als Liste mit MC1 vs MC2 und Format (1v1 oder 2v2). Antworte nur als JSON: {name, location, date, battles: [{mc1, mc2, format}]}',
-            },
-          ],
-        },
-      ],
-    }),
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ base64, mediaType: file.type }),
   })
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
-    throw new Error(err.error?.message ?? `API-Fehler ${res.status}`)
+    const err = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(err.error ?? `Fehler ${res.status}`)
   }
 
-  const data = await res.json() as { content: { type: string; text: string }[] }
-  const text = data.content?.[0]?.text ?? ''
-  const match = text.match(/\{[\s\S]*\}/)
-  if (!match) throw new Error('Kein JSON in der Antwort')
-  return JSON.parse(match[0]) as ReturnType<typeof analyzeBattlecard> extends Promise<infer T> ? T : never
+  return res.json() as Promise<ReturnType<typeof analyzeBattlecard> extends Promise<infer T> ? T : never>
 }
 
 export default function NewEvent({ onBack, onCreated }: Props) {
