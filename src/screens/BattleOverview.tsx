@@ -43,14 +43,15 @@ const defaultBattleScore = (): BattleScore => ({
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function roundAvg(rs: RoundScore) {
-  let s1 = 0, s2 = 0, count = 0
+  // Doubled category counts twice → denominator = CATEGORIES.length + 1 when active
+  const totalWeight = CATEGORIES.length + (rs.double_down_category ? 1 : 0)
+  let s1 = 0, s2 = 0
   for (const cat of CATEGORIES) {
     const w = rs.double_down_category === cat.key ? 2 : 1
     s1 += (rs[`${cat.key}_mc1` as keyof RoundScore] as number) * w
     s2 += (rs[`${cat.key}_mc2` as keyof RoundScore] as number) * w
-    count += w
   }
-  return { mc1: s1 / count, mc2: s2 / count }
+  return { mc1: s1 / totalWeight, mc2: s2 / totalWeight }
 }
 
 function battleAvg(bs: BattleScore) {
@@ -361,15 +362,16 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
                           2×
                         </button>
                       </div>
-                      {/* Stepper row: MC1-name | stepper | stepper | MC2-name */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto 1fr', gap: '0.5rem' }}
+                      {/* Stepper row: MC1-name | stepper | divider | stepper | MC2-name */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1px auto 1fr', gap: '0 0.5rem' }}
                         className="items-center">
-                        <span className="font-inter text-[9px] uppercase tracking-wider text-app-muted text-right truncate">
+                        <span className="font-inter text-[9px] uppercase tracking-wider text-app-muted text-right truncate pr-1">
                           {battle.mc1}
                         </span>
                         <Stepper value={rs[mc1Key] as number} onChange={v => setScoreVal(round, mc1Key, v)} />
+                        <div className="self-stretch" style={{ background: 'rgba(255,255,255,0.1)', margin: '4px 8px' }} />
                         <Stepper value={rs[mc2Key] as number} onChange={v => setScoreVal(round, mc2Key, v)} />
-                        <span className="font-inter text-[9px] uppercase tracking-wider text-app-muted text-left truncate">
+                        <span className="font-inter text-[9px] uppercase tracking-wider text-app-muted text-left truncate pl-1">
                           {battle.mc2}
                         </span>
                       </div>

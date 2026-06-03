@@ -108,23 +108,33 @@ export default function Reveal({ user: _user, eventId, onBack }: Props) {
                             )}
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            {/* MC1 row */}
-                            <div className="bg-white/5 rounded px-3 py-1.5">
-                              <p className="font-inter text-[9px] text-app-muted mb-0.5 truncate">{battle.mc1}</p>
-                              <p className="font-inter text-xs">
-                                <span className="text-primary font-bold">Ben: {bMc1}</span>
-                                <span className="text-app-muted"> · </span>
-                                <span className="text-secondary font-bold">Löwe: {lMc1}</span>
-                              </p>
+                            {/* MC1 scores */}
+                            <div className="bg-white/5 rounded px-3 py-2">
+                              <p className="font-inter text-[9px] text-app-muted mb-1 truncate">{battle.mc1}</p>
+                              <div className="flex items-baseline gap-3">
+                                <span>
+                                  <span className="font-inter text-[10px] text-app-muted">Ben </span>
+                                  <span className={`font-bebas text-[22px] leading-none ${bMc1 >= lMc1 ? 'text-primary' : 'text-[#444]'}`}>{bMc1}</span>
+                                </span>
+                                <span>
+                                  <span className="font-inter text-[10px] text-app-muted">Löwe </span>
+                                  <span className={`font-bebas text-[22px] leading-none ${lMc1 > bMc1 ? 'text-secondary' : 'text-[#444]'}`}>{lMc1}</span>
+                                </span>
+                              </div>
                             </div>
-                            {/* MC2 row */}
-                            <div className="bg-white/5 rounded px-3 py-1.5">
-                              <p className="font-inter text-[9px] text-app-muted mb-0.5 truncate">{battle.mc2}</p>
-                              <p className="font-inter text-xs">
-                                <span className="text-primary font-bold">Ben: {bMc2}</span>
-                                <span className="text-app-muted"> · </span>
-                                <span className="text-secondary font-bold">Löwe: {lMc2}</span>
-                              </p>
+                            {/* MC2 scores */}
+                            <div className="bg-white/5 rounded px-3 py-2">
+                              <p className="font-inter text-[9px] text-app-muted mb-1 truncate">{battle.mc2}</p>
+                              <div className="flex items-baseline gap-3">
+                                <span>
+                                  <span className="font-inter text-[10px] text-app-muted">Ben </span>
+                                  <span className={`font-bebas text-[22px] leading-none ${bMc2 >= lMc2 ? 'text-primary' : 'text-[#444]'}`}>{bMc2}</span>
+                                </span>
+                                <span>
+                                  <span className="font-inter text-[10px] text-app-muted">Löwe </span>
+                                  <span className={`font-bebas text-[22px] leading-none ${lMc2 > bMc2 ? 'text-secondary' : 'text-[#444]'}`}>{lMc2}</span>
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
