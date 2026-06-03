@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 import type { Battle, CategoryKey } from '../types'
 import { CATEGORIES } from '../types'
 import Stepper from '../components/Stepper'
@@ -68,16 +70,14 @@ function isBattleComplete(bs: BattleScore) {
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
-interface Props {
-  displayName: string
-  eventId: string
-  onBack: () => void
-  onSubmitted: (otherAlreadyDone: boolean) => void
-}
-
 // ── Main component ───────────────────────────────────────────────────────────
 
-export default function BattleOverview({ displayName, eventId, onBack, onSubmitted }: Props) {
+export default function BattleOverview() {
+  const { roomId, eventId } = useParams<{ roomId: string; eventId: string }>()
+  const { profile } = useAuth()
+  const navigate = useNavigate()
+  const displayName = profile?.display_name ?? ''
+
   const [eventName, setEventName] = useState('')
   const [battles, setBattles] = useState<Battle[]>([])
   const [scores, setScores] = useState<Record<string, BattleScore>>({})
@@ -87,7 +87,7 @@ export default function BattleOverview({ displayName, eventId, onBack, onSubmitt
   const [isEditing, setIsEditing] = useState(false)
   const [activeBattleId, setActiveBattleId] = useState<string | null>(null)
 
-  useEffect(() => { load() }, [eventId, displayName]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (eventId) load() }, [eventId, displayName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     try {
@@ -181,7 +181,11 @@ export default function BattleOverview({ displayName, eventId, onBack, onSubmitt
       const otherDone = otherNames.some(name =>
         (allOtherVerdicts ?? []).filter((v: { user_name: string }) => v.user_name === name).length === battles.length
       )
-      onSubmitted(otherDone)
+      if (otherDone) {
+        navigate(`/room/${roomId}/reveal/${eventId}`, { replace: true })
+      } else {
+        navigate(`/room/${roomId}/wait/${eventId}`, { replace: true })
+      }
     } catch {
       setError('Fehler beim Einreichen. Bitte erneut versuchen.')
       setSubmitting(false)
@@ -217,7 +221,7 @@ export default function BattleOverview({ displayName, eventId, onBack, onSubmitt
   return (
     <div className="min-h-screen">
       <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 flex items-center gap-3 z-10 noise-header">
-        <button onClick={onBack} className="text-app-muted text-xl w-8 flex-shrink-0">←</button>
+        <button onClick={() => navigate(roomId ? `/room/${roomId}` : '/')} className="text-app-muted text-xl w-8 flex-shrink-0">←</button>
         <div className="flex-1 min-w-0">
           <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">
             {isEditing ? 'Bewertung bearbeiten' : 'Bewertung'}

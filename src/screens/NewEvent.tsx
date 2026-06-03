@@ -1,15 +1,11 @@
 import { useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 interface BattleInput {
   mc1: string
   mc2: string
   format: '1v1' | '2v2'
-}
-
-interface Props {
-  onBack: () => void
-  onCreated: () => void
 }
 
 const SUPPORTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
@@ -58,7 +54,9 @@ async function analyzeBattlecard(file: File): Promise<{
   return parsed as ReturnType<typeof analyzeBattlecard> extends Promise<infer T> ? T : never
 }
 
-export default function NewEvent({ onBack, onCreated }: Props) {
+export default function NewEvent() {
+  const { roomId } = useParams<{ roomId: string }>()
+  const navigate = useNavigate()
   const [name, setName] = useState('')
   const [date, setDate] = useState('')
   const [location, setLocation] = useState('')
@@ -128,7 +126,7 @@ export default function NewEvent({ onBack, onCreated }: Props) {
     try {
       const { data: event, error: eventError } = await supabase
         .from('events')
-        .insert({ name: name.trim(), date: date.trim() || null, location: location.trim() || null })
+        .insert({ name: name.trim(), date: date.trim() || null, location: location.trim() || null, room_id: roomId ?? null })
         .select()
         .single()
       if (eventError) throw eventError
@@ -144,7 +142,7 @@ export default function NewEvent({ onBack, onCreated }: Props) {
       )
       if (battlesError) throw battlesError
 
-      onCreated()
+      navigate(roomId ? `/room/${roomId}` : '/', { replace: true })
     } catch {
       setError('Fehler beim Speichern. Bitte erneut versuchen.')
       setSaving(false)
@@ -156,7 +154,7 @@ export default function NewEvent({ onBack, onCreated }: Props) {
   return (
     <div className="min-h-screen">
       <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 flex items-center gap-3 z-10 noise-header">
-        <button onClick={onBack} className="text-app-muted text-xl w-8">←</button>
+        <button onClick={() => navigate(roomId ? `/room/${roomId}` : '/')} className="text-app-muted text-xl w-8">←</button>
         <h1 className="font-bebas text-xl text-app-text tracking-wider">Neues Event</h1>
       </div>
 

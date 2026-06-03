@@ -1,19 +1,15 @@
 import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 import type { Battle, Score, BattleVerdict } from '../types'
 import { CATEGORIES } from '../types'
 
 interface BattleReveal {
   battle: Battle
-  userNames: string[]                       // all users who scored, in order
-  scores: Record<string, Score[]>           // keyed by user_name
-  verdicts: Record<string, BattleVerdict>   // keyed by user_name
-}
-
-interface Props {
-  displayName: string
-  eventId: string
-  onBack: () => void
+  userNames: string[]
+  scores: Record<string, Score[]>
+  verdicts: Record<string, BattleVerdict>
 }
 
 const winnerLabel = (w: string | null, mc1: string, mc2: string) =>
@@ -23,7 +19,11 @@ const winnerLabel = (w: string | null, mc1: string, mc2: string) =>
 const USER_COLORS = ['text-primary', 'text-secondary', 'text-accent']
 const USER_BG_COLORS = ['bg-primary/20', 'bg-secondary/20', 'bg-accent/20']
 
-export default function Reveal({ displayName, eventId, onBack }: Props) {
+export default function Reveal() {
+  const { roomId, eventId } = useParams<{ roomId: string; eventId: string }>()
+  const { profile } = useAuth()
+  const navigate = useNavigate()
+  const displayName = profile?.display_name ?? ''
   const [eventName, setEventName] = useState('')
   const [reveals, setReveals] = useState<BattleReveal[]>([])
   const [loading, setLoading] = useState(true)
@@ -78,7 +78,7 @@ export default function Reveal({ displayName, eventId, onBack }: Props) {
   return (
     <div className="min-h-screen">
       <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 flex items-center gap-3 z-10 noise-header">
-        <button onClick={onBack} className="text-app-muted text-xl w-8">←</button>
+        <button onClick={() => navigate(roomId ? `/room/${roomId}` : '/')} className="text-app-muted text-xl w-8">←</button>
         <div>
           <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">Reveal</p>
           <h1 className="font-bebas text-xl text-app-text tracking-wider">{eventName}</h1>

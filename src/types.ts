@@ -1,8 +1,24 @@
+export interface Room {
+  id: string
+  name: string
+  invite_code: string
+  created_by: string | null
+  created_at: string
+}
+
+export interface RoomMember {
+  id: string
+  room_id: string
+  user_id: string
+  joined_at: string
+}
+
 export interface Event {
   id: string
   name: string
   date: string | null
   location: string | null
+  room_id: string | null
   created_at: string
 }
 
