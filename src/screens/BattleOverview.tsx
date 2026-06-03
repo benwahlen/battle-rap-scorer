@@ -32,15 +32,12 @@ const defaultRound = (): RoundScore => ({
   delivery_mc1: 5, delivery_mc2: 5,
   struktur_mc1: 5, struktur_mc2: 5,
   crowd_mc1: 5, crowd_mc2: 5,
-  round_winner: null,
-  round_comment: '',
-  double_down_category: null,
+  round_winner: null, round_comment: '', double_down_category: null,
 })
 
 const defaultBattleScore = (): BattleScore => ({
   rounds: { 1: defaultRound(), 2: defaultRound(), 3: defaultRound() },
-  overall_winner: null,
-  battle_comment: '',
+  overall_winner: null, battle_comment: '',
 })
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -65,8 +62,7 @@ function battleAvg(bs: BattleScore) {
 }
 
 function isBattleComplete(bs: BattleScore) {
-  return bs.overall_winner !== null &&
-    [1, 2, 3].every(r => bs.rounds[r]?.round_winner !== null)
+  return bs.overall_winner !== null && [1, 2, 3].every(r => bs.rounds[r]?.round_winner !== null)
 }
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -92,10 +88,7 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
 
   const otherUser: UserName = user === 'Ben' ? 'Löwe' : 'Ben'
 
-  useEffect(() => {
-    load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId, user])
+  useEffect(() => { load() }, [eventId, user]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     try {
@@ -106,22 +99,17 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
       setEventName(event?.name ?? '')
       const list: Battle[] = battlesData ?? []
       setBattles(list)
-
       const ids = list.map(b => b.id)
       if (ids.length === 0) { setLoading(false); return }
 
-      // Check if user already submitted
       const { data: verdicts } = await supabase
         .from('battle_verdicts').select('*').in('battle_id', ids).eq('user_name', user)
-
       const alreadyDone = (verdicts?.length ?? 0) === ids.length
-
       let init: Record<string, BattleScore> = {}
 
       if (alreadyDone) {
         const { data: existingScores } = await supabase
           .from('scores').select('*').in('battle_id', ids).eq('user_name', user)
-
         for (const b of list) {
           const verdict = verdicts!.find(v => v.battle_id === b.id)
           const bScores = (existingScores ?? []).filter(s => s.battle_id === b.id)
@@ -140,8 +128,7 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
             } : defaultRound()
           }
           init[b.id] = {
-            rounds,
-            overall_winner: (verdict?.overall_winner as OverallWinner) ?? null,
+            rounds, overall_winner: (verdict?.overall_winner as OverallWinner) ?? null,
             battle_comment: verdict?.battle_comment ?? '',
           }
         }
@@ -149,7 +136,6 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
       } else {
         for (const b of list) init[b.id] = defaultBattleScore()
       }
-
       setScores(init)
     } catch {
       setError('Fehler beim Laden.')
@@ -162,8 +148,7 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
     setScores(prev => ({ ...prev, [battleId]: score }))
 
   async function handleSubmit() {
-    setSubmitting(true)
-    setError(null)
+    setSubmitting(true); setError(null)
     try {
       for (const b of battles) {
         const bs = scores[b.id]
@@ -176,8 +161,7 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
             delivery_mc1: rs.delivery_mc1, delivery_mc2: rs.delivery_mc2,
             struktur_mc1: rs.struktur_mc1, struktur_mc2: rs.struktur_mc2,
             crowd_mc1: rs.crowd_mc1, crowd_mc2: rs.crowd_mc2,
-            round_winner: rs.round_winner,
-            round_comment: rs.round_comment || null,
+            round_winner: rs.round_winner, round_comment: rs.round_comment || null,
             double_down_category: rs.double_down_category || null,
           }, { onConflict: 'battle_id,user_name,round_number' })
           if (e) throw e
@@ -189,11 +173,9 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
         }, { onConflict: 'battle_id,user_name' })
         if (ve) throw ve
       }
-
       const { data: otherVerdicts } = await supabase
         .from('battle_verdicts').select('battle_id')
         .in('battle_id', battles.map(b => b.id)).eq('user_name', otherUser)
-
       onSubmitted((otherVerdicts ?? []).length === battles.length)
     } catch {
       setError('Fehler beim Einreichen. Bitte erneut versuchen.')
@@ -201,7 +183,7 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
     }
   }
 
-  // ── Render: single battle view ──────────────────────────────────────────────
+  // ── Single battle view ──────────────────────────────────────────────────────
   if (activeBattleId !== null) {
     const battle = battles.find(b => b.id === activeBattleId)
     if (!battle || !scores[activeBattleId]) return null
@@ -217,24 +199,25 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
     )
   }
 
-  // ── Render: overview ────────────────────────────────────────────────────────
+  // ── Overview ────────────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <p className="text-zinc-600">Lade…</p>
+    <div className="min-h-screen flex items-center justify-center">
+      <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">Lade…</p>
     </div>
   )
 
   const allComplete = battles.length > 0 && battles.every(b => scores[b.id] && isBattleComplete(scores[b.id]))
+  const doneCount = battles.filter(b => scores[b.id] && isBattleComplete(scores[b.id])).length
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="sticky top-0 bg-black/95 backdrop-blur border-b border-zinc-800 px-4 py-4 flex items-center gap-3 z-10 noise-header">
-        <button onClick={onBack} className="text-zinc-400 text-xl w-8 flex-shrink-0">←</button>
+    <div className="min-h-screen">
+      <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 flex items-center gap-3 z-10 noise-header">
+        <button onClick={onBack} className="text-app-muted text-xl w-8 flex-shrink-0">←</button>
         <div className="flex-1 min-w-0">
-          <p className="text-zinc-500 text-xs uppercase tracking-widest">
-            {isEditing ? 'BEWERTUNG BEARBEITEN' : 'BEWERTUNG'}
+          <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">
+            {isEditing ? 'Bewertung bearbeiten' : 'Bewertung'}
           </p>
-          <h1 className="text-lg font-black uppercase tracking-tight truncate">{eventName}</h1>
+          <h1 className="font-bebas text-xl text-app-text tracking-wider truncate">{eventName}</h1>
         </div>
       </div>
 
@@ -242,50 +225,53 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
         {battles.map((b, i) => {
           const bs = scores[b.id]
           const done = bs && isBattleComplete(bs)
+          const avg = bs ? battleAvg(bs) : null
           return (
-            <button
-              key={b.id}
-              onClick={() => setActiveBattleId(b.id)}
-              className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-left active:scale-95 transition-transform w-full"
-            >
+            <button key={b.id} onClick={() => setActiveBattleId(b.id)}
+              className="card rounded-lg p-4 text-left active:scale-95 transition-transform w-full">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-zinc-600 text-xs uppercase tracking-wider mb-0.5">Battle {i + 1} · {b.format}</p>
-                  <p className="font-black text-white truncate">{b.mc1} vs {b.mc2}</p>
+                  <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.1em] mb-0.5">
+                    Battle {i + 1} · {b.format}
+                  </p>
+                  <p className="font-bebas text-lg text-app-text tracking-wider truncate leading-tight">
+                    {b.mc1} vs {b.mc2}
+                  </p>
+                  {done && avg && (
+                    <p className="font-inter text-[10px] text-app-muted mt-1">
+                      {b.mc1} Ø {avg.mc1.toFixed(1)} · {b.mc2} Ø {avg.mc2.toFixed(1)}
+                    </p>
+                  )}
                 </div>
-                <span className={`text-xs font-bold px-2.5 py-1 rounded ${done ? 'bg-green-500/20 text-green-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                  {done ? '✓ FERTIG' : 'OFFEN'}
+                <span className={`font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 ${
+                  done ? 'bg-secondary/20 text-secondary' : 'bg-primary/20 text-primary'
+                }`}>
+                  {done ? '✓ Bewertet' : 'Ausstehend'}
                 </span>
               </div>
-              {done && bs && (() => {
-                const avg = battleAvg(bs)
-                return (
-                  <p className="text-xs text-zinc-600 mt-2">
-                    {b.mc1} Ø {avg.mc1.toFixed(1)} · {b.mc2} Ø {avg.mc2.toFixed(1)}
-                  </p>
-                )
-              })()}
             </button>
           )
         })}
-
         {error && (
-          <div className="bg-red-900/30 border border-red-800 rounded-lg p-3 text-red-400 text-sm">{error}</div>
+          <div className="card border-red-800/50 rounded-lg p-3 text-red-400 text-sm">{error}</div>
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-black border-t border-zinc-800">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-app-bg/90 backdrop-blur border-t border-white/5">
         {allComplete ? (
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="w-full bg-yellow-400 text-black font-black py-4 rounded-lg uppercase tracking-wider text-sm disabled:opacity-50 active:scale-95 transition-transform"
-          >
-            {submitting ? 'WIRD EINGEREICHT…' : isEditing ? 'BEWERTUNG AKTUALISIEREN' : 'BEWERTUNG EINREICHEN'}
+          <button onClick={handleSubmit} disabled={submitting}
+            className="w-full bg-primary font-bebas text-app-text py-4 rounded-lg tracking-[2px] text-base disabled:opacity-50 active:scale-95 transition-transform shadow-lg shadow-primary/30">
+            {submitting ? 'Wird eingereicht…' : isEditing ? 'Bewertung aktualisieren' : 'Bewertung einreichen'}
           </button>
         ) : (
-          <div className="text-center text-zinc-600 text-xs uppercase tracking-wider py-3">
-            {battles.filter(b => scores[b.id] && isBattleComplete(scores[b.id])).length}/{battles.length} Battles bewertet
+          <div className="text-center">
+            <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">
+              {doneCount}/{battles.length} Battles bewertet
+            </p>
+            <div className="mt-2 h-1 bg-white/5 rounded-full overflow-hidden">
+              <div className="h-full bg-primary rounded-full transition-all"
+                style={{ width: battles.length ? `${(doneCount / battles.length) * 100}%` : '0%' }} />
+            </div>
           </div>
         )}
       </div>
@@ -305,118 +291,121 @@ interface SingleBattleProps {
 }
 
 function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, onBack }: SingleBattleProps) {
-  const setScore = (round: number, field: keyof Omit<RoundScore, 'round_winner' | 'round_comment' | 'double_down_category'>, value: number) => {
-    onChange({
-      ...score,
-      rounds: { ...score.rounds, [round]: { ...score.rounds[round], [field]: value } },
-    })
-  }
+  const setScoreVal = (round: number, field: keyof Omit<RoundScore, 'round_winner' | 'round_comment' | 'double_down_category'>, value: number) =>
+    onChange({ ...score, rounds: { ...score.rounds, [round]: { ...score.rounds[round], [field]: value } } })
 
-  const setRoundWinner = (round: number, winner: RoundWinner) => {
-    onChange({
-      ...score,
-      rounds: { ...score.rounds, [round]: { ...score.rounds[round], round_winner: winner } },
-    })
-  }
+  const setRoundWinner = (round: number, winner: RoundWinner) =>
+    onChange({ ...score, rounds: { ...score.rounds, [round]: { ...score.rounds[round], round_winner: winner } } })
 
-  const setRoundComment = (round: number, comment: string) => {
-    onChange({
-      ...score,
-      rounds: { ...score.rounds, [round]: { ...score.rounds[round], round_comment: comment } },
-    })
-  }
+  const setRoundComment = (round: number, comment: string) =>
+    onChange({ ...score, rounds: { ...score.rounds, [round]: { ...score.rounds[round], round_comment: comment } } })
 
   const toggleDoubleDown = (round: number, catKey: CategoryKey) => {
-    const current = score.rounds[round].double_down_category
-    onChange({
-      ...score,
-      rounds: { ...score.rounds, [round]: { ...score.rounds[round], double_down_category: current === catKey ? null : catKey } },
-    })
+    const cur = score.rounds[round].double_down_category
+    onChange({ ...score, rounds: { ...score.rounds, [round]: { ...score.rounds[round], double_down_category: cur === catKey ? null : catKey } } })
   }
 
-  const setOverallWinner = (winner: OverallWinner) => onChange({ ...score, overall_winner: winner })
+  const setOverallWinner = (w: OverallWinner) => onChange({ ...score, overall_winner: w })
   const setBattleComment = (c: string) => onChange({ ...score, battle_comment: c })
-
   const avg = battleAvg(score)
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="sticky top-0 bg-black/95 backdrop-blur border-b border-zinc-800 px-4 py-4 z-10 noise-header">
+    <div className="min-h-screen">
+      <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 z-10 noise-header">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-zinc-400 text-xl w-8 flex-shrink-0">←</button>
+          <button onClick={onBack} className="text-app-muted text-xl w-8 flex-shrink-0">←</button>
           <div className="flex-1 min-w-0">
-            <p className="text-zinc-500 text-xs uppercase tracking-widest">Battle {battleIndex + 1}/{battleCount}</p>
-            <h1 className="font-black text-base uppercase tracking-tight truncate">{battle.mc1} vs {battle.mc2}</h1>
+            <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">
+              Battle {battleIndex + 1}/{battleCount} · {battle.format}
+            </p>
+            <h1 className="font-bebas text-lg text-app-text tracking-wider truncate leading-tight">
+              {battle.mc1} vs {battle.mc2}
+            </h1>
           </div>
-          <span className="text-zinc-700 text-xs uppercase">{battle.format}</span>
         </div>
       </div>
 
       <div className="p-4 pb-24 flex flex-col gap-4">
         {[1, 2, 3].map(round => {
           const rs = score.rounds[round]
-          const avg = roundAvg(rs)
-          return (
-            <div key={round} className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
-              {/* Round header */}
-              <div className="px-4 py-3 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between">
-                <span className="font-black text-yellow-400 text-sm uppercase tracking-widest">Runde {round}</span>
-                <span className="text-zinc-600 text-xs">
-                  {battle.mc1} Ø {avg.mc1.toFixed(1)} · {battle.mc2} Ø {avg.mc2.toFixed(1)}
-                </span>
-              </div>
+          const rAvg = roundAvg(rs)
+          const mc1Leading = rAvg.mc1 >= rAvg.mc2
 
-              {/* MC name headers */}
-              <div className="px-4 pt-3 pb-1 flex justify-between text-xs text-zinc-500 font-bold uppercase tracking-wider">
-                <span className="w-[100px] text-center truncate">{battle.mc1}</span>
-                <span className="w-[100px] text-center truncate">{battle.mc2}</span>
+          return (
+            <div key={round} className="card rounded-lg overflow-hidden">
+              {/* Round header */}
+              <div className="px-4 py-3 bg-white/5 border-b border-white/5 flex items-center justify-between">
+                <span className="font-bebas text-lg text-primary tracking-widest">Runde {round}</span>
               </div>
 
               {/* Categories */}
-              <div className="px-4 pb-3 flex flex-col gap-3">
+              <div className="px-3 pt-3 pb-2 flex flex-col gap-3">
                 {CATEGORIES.map(cat => {
                   const mc1Key = `${cat.key}_mc1` as keyof Omit<RoundScore, 'round_winner' | 'round_comment' | 'double_down_category'>
                   const mc2Key = `${cat.key}_mc2` as keyof Omit<RoundScore, 'round_winner' | 'round_comment' | 'double_down_category'>
                   const isDoubled = rs.double_down_category === cat.key
+
                   return (
-                    <div
-                      key={cat.key}
-                      className={`flex flex-col gap-1.5 p-2 rounded-lg transition-all ${isDoubled ? 'double-down-active bg-yellow-400/5' : ''}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">{cat.label}</span>
+                    <div key={cat.key}
+                      className={`rounded-lg p-2 transition-all ${isDoubled ? 'double-down-active' : ''}`}>
+                      {/* Category label + 2x button */}
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <span className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted text-center">
+                          {cat.label}
+                        </span>
                         <button
                           onClick={() => toggleDoubleDown(round, cat.key)}
-                          className={`text-xs font-black px-2 py-0.5 rounded transition-colors ${isDoubled ? 'bg-yellow-400 text-black' : 'bg-zinc-800 text-zinc-500'}`}
-                        >
+                          className={`font-bebas text-xs px-2 py-0.5 rounded tracking-wider transition-colors ${
+                            isDoubled ? 'bg-primary text-white shadow-sm shadow-primary/50' : 'bg-white/10 text-app-muted'
+                          }`}>
                           2×
                         </button>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <Stepper
-                          value={rs[mc1Key] as number}
-                          onChange={v => setScore(round, mc1Key, v)}
-                        />
-                        <Stepper
-                          value={rs[mc2Key] as number}
-                          onChange={v => setScore(round, mc2Key, v)}
-                        />
+                      {/* Stepper row: MC1-name | stepper | stepper | MC2-name */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto 1fr', gap: '0.5rem' }}
+                        className="items-center">
+                        <span className="font-inter text-[9px] uppercase tracking-wider text-app-muted text-right truncate">
+                          {battle.mc1}
+                        </span>
+                        <Stepper value={rs[mc1Key] as number} onChange={v => setScoreVal(round, mc1Key, v)} />
+                        <Stepper value={rs[mc2Key] as number} onChange={v => setScoreVal(round, mc2Key, v)} />
+                        <span className="font-inter text-[9px] uppercase tracking-wider text-app-muted text-left truncate">
+                          {battle.mc2}
+                        </span>
                       </div>
                     </div>
                   )
                 })}
               </div>
 
+              {/* Live average banner */}
+              <div className="mx-3 mb-3 card rounded-lg px-4 py-3 flex items-center justify-between">
+                <div className="text-center">
+                  <div className={`font-bebas text-[40px] leading-none ${mc1Leading ? 'text-primary' : 'text-app-muted'}`}>
+                    {rAvg.mc1.toFixed(1)}
+                  </div>
+                  <p className="font-inter text-[9px] uppercase tracking-wider text-app-muted">{battle.mc1}</p>
+                </div>
+                <span className="font-inter text-[10px] text-app-muted uppercase tracking-widest">Ø</span>
+                <div className="text-center">
+                  <div className={`font-bebas text-[40px] leading-none ${!mc1Leading ? 'text-primary' : 'text-app-muted'}`}>
+                    {rAvg.mc2.toFixed(1)}
+                  </div>
+                  <p className="font-inter text-[9px] uppercase tracking-wider text-app-muted">{battle.mc2}</p>
+                </div>
+              </div>
+
               {/* Round winner */}
-              <div className="px-4 pb-4 border-t border-zinc-800 pt-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Rundensieger</p>
+              <div className="px-3 pb-3 border-t border-white/5 pt-3">
+                <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted mb-2 text-center">Rundensieger</p>
                 <div className="flex gap-2">
                   {(['mc1', 'draw', 'mc2'] as RoundWinner[]).map(w => (
-                    <button
-                      key={w}
-                      onClick={() => setRoundWinner(round, w)}
-                      className={`flex-1 py-2.5 rounded text-xs font-black uppercase tracking-wide transition-colors truncate px-1 ${rs.round_winner === w ? 'bg-yellow-400 text-black' : 'bg-zinc-800 text-zinc-400'}`}
-                    >
+                    <button key={w} onClick={() => setRoundWinner(round, w)}
+                      className={`flex-1 py-2.5 rounded font-bebas tracking-[2px] text-sm transition-colors truncate px-1 ${
+                        rs.round_winner === w
+                          ? 'bg-primary text-white shadow-sm shadow-primary/40'
+                          : 'bg-white/10 text-app-muted'
+                      }`}>
                       {w === 'mc1' ? battle.mc1 : w === 'mc2' ? battle.mc2 : 'Draw'}
                     </button>
                   ))}
@@ -424,58 +413,74 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
               </div>
 
               {/* Round comment */}
-              <div className="px-4 pb-4">
+              <div className="px-3 pb-3">
                 <textarea
                   placeholder="Kommentar zur Runde (optional)"
                   value={rs.round_comment}
                   onChange={e => setRoundComment(round, e.target.value)}
                   rows={2}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-400 text-sm resize-none"
+                  className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-app-text placeholder-app-muted/50 focus:outline-none focus:border-primary/50 font-inter text-sm resize-none"
                 />
               </div>
             </div>
           )
         })}
 
-        {/* Overall winner + Battle avg */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-black text-sm uppercase tracking-wider">Gesamtsieger</h2>
-            <span className="text-zinc-600 text-xs">
-              {battle.mc1} Ø {avg.mc1.toFixed(1)} · {battle.mc2} Ø {avg.mc2.toFixed(1)}
-            </span>
+        {/* Battle avg + Overall winner */}
+        <div className="card rounded-lg p-4 flex flex-col gap-4">
+          {/* Battle total average */}
+          <div className="flex items-center justify-between">
+            <div className="text-center flex-1">
+              <div className={`font-bebas text-[40px] leading-none ${avg.mc1 >= avg.mc2 ? 'text-primary' : 'text-app-muted'}`}>
+                {avg.mc1.toFixed(1)}
+              </div>
+              <p className="font-inter text-[9px] uppercase tracking-wider text-app-muted">{battle.mc1}</p>
+            </div>
+            <div className="text-center px-3">
+              <p className="font-inter text-[10px] text-app-muted uppercase tracking-widest">Battle Ø</p>
+            </div>
+            <div className="text-center flex-1">
+              <div className={`font-bebas text-[40px] leading-none ${avg.mc2 > avg.mc1 ? 'text-primary' : 'text-app-muted'}`}>
+                {avg.mc2.toFixed(1)}
+              </div>
+              <p className="font-inter text-[9px] uppercase tracking-wider text-app-muted">{battle.mc2}</p>
+            </div>
           </div>
-          <div className="flex gap-2">
-            {(['mc1', 'mc2'] as OverallWinner[]).map(w => (
-              <button
-                key={w}
-                onClick={() => setOverallWinner(w)}
-                className={`flex-1 py-3 rounded font-black uppercase tracking-wide text-sm transition-colors truncate ${score.overall_winner === w ? 'bg-yellow-400 text-black' : 'bg-zinc-800 text-zinc-400'}`}
-              >
-                {w === 'mc1' ? battle.mc1 : battle.mc2}
-              </button>
-            ))}
-          </div>
-        </div>
 
-        {/* Battle comment */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Battle-Fazit (optional)</p>
-          <textarea
-            placeholder="Gesamteindruck, Highlights, Diskussionspunkte…"
-            value={score.battle_comment}
-            onChange={e => setBattleComment(e.target.value)}
-            rows={3}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-400 text-sm resize-none"
-          />
+          {/* Overall winner */}
+          <div>
+            <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted mb-2 text-center">Gesamtsieger</p>
+            <div className="flex gap-2">
+              {(['mc1', 'mc2'] as OverallWinner[]).map(w => (
+                <button key={w} onClick={() => setOverallWinner(w)}
+                  className={`flex-1 py-3 rounded font-bebas tracking-[2px] text-sm transition-colors truncate ${
+                    score.overall_winner === w
+                      ? 'bg-primary text-white shadow-md shadow-primary/40'
+                      : 'bg-white/10 text-app-muted'
+                  }`}>
+                  {w === 'mc1' ? battle.mc1 : battle.mc2}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Battle comment */}
+          <div>
+            <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted mb-2">Battle-Fazit (optional)</p>
+            <textarea
+              placeholder="Gesamteindruck, Highlights, Diskussionspunkte…"
+              value={score.battle_comment}
+              onChange={e => setBattleComment(e.target.value)}
+              rows={3}
+              className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-app-text placeholder-app-muted/50 focus:outline-none focus:border-primary/50 font-inter text-sm resize-none"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-black border-t border-zinc-800">
-        <button
-          onClick={onBack}
-          className="w-full bg-zinc-800 text-white font-black py-4 rounded-lg uppercase tracking-wider text-sm active:scale-95 transition-transform"
-        >
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-app-bg/90 backdrop-blur border-t border-white/5">
+        <button onClick={onBack}
+          className="w-full bg-white/10 text-app-text font-bebas py-4 rounded-lg tracking-[2px] text-sm active:scale-95 transition-transform">
           ← Zur Übersicht
         </button>
       </div>

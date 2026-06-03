@@ -25,15 +25,11 @@ export default function WaitScreen({ user, eventId, onBothDone, onBack, onEdit }
   async function check() {
     if (doneRef.current) return
     try {
-      const { data: battles } = await supabase
-        .from('battles').select('id').eq('event_id', eventId)
+      const { data: battles } = await supabase.from('battles').select('id').eq('event_id', eventId)
       const ids = (battles ?? []).map(b => b.id)
       if (ids.length === 0) return
-
       const { data: verdicts } = await supabase
-        .from('battle_verdicts').select('user_name')
-        .in('battle_id', ids).eq('user_name', otherUser)
-
+        .from('battle_verdicts').select('user_name').in('battle_id', ids).eq('user_name', otherUser)
       if ((verdicts ?? []).length === ids.length) {
         doneRef.current = true
         if (intervalRef.current) clearInterval(intervalRef.current)
@@ -43,33 +39,31 @@ export default function WaitScreen({ user, eventId, onBothDone, onBack, onEdit }
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
-      <div className="sticky top-0 bg-black/95 backdrop-blur border-b border-zinc-800 px-4 py-4 flex items-center gap-3 noise-header">
-        <button onClick={onBack} className="text-zinc-400 text-xl w-8">←</button>
-        <h1 className="text-xl font-black uppercase tracking-tight">Warten…</h1>
+    <div className="min-h-screen flex flex-col">
+      <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 flex items-center gap-3 noise-header">
+        <button onClick={onBack} className="text-app-muted text-xl w-8">←</button>
+        <h1 className="font-bebas text-xl text-app-text tracking-wider">Warten…</h1>
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-6">
         <div className="text-7xl animate-pulse">⏳</div>
         <div>
-          <h2 className="text-2xl font-black uppercase tracking-tight mb-2">Bewertung eingereicht!</h2>
-          <p className="text-zinc-400 text-lg">
-            Warte auf <span className="text-yellow-400 font-black">{otherUser}</span>…
+          <h2 className="font-bebas text-3xl text-app-text tracking-wider mb-2">Bewertung eingereicht!</h2>
+          <p className="font-inter text-app-muted text-base">
+            Warte auf <span className="text-secondary font-bold">{otherUser}</span>…
           </p>
         </div>
-        <p className="text-zinc-700 text-xs uppercase tracking-wider">
+        <p className="font-inter text-app-muted/50 text-[10px] uppercase tracking-[0.15em]">
           Aktualisiert sich automatisch alle 10 Sek.
         </p>
       </div>
 
-      <div className="p-4 border-t border-zinc-800 flex flex-col gap-3">
-        <button
-          onClick={onEdit}
-          className="w-full bg-zinc-900 border border-zinc-700 text-white font-black py-3.5 rounded-lg uppercase tracking-wider text-sm active:scale-95 transition-transform"
-        >
+      <div className="p-4 border-t border-white/5 flex flex-col gap-3">
+        <button onClick={onEdit}
+          className="w-full card font-bebas text-app-text py-3.5 rounded-lg tracking-[2px] text-sm active:scale-95 transition-transform border-primary/30">
           ✎ Bewertung bearbeiten
         </button>
-        <p className="text-zinc-700 text-xs text-center uppercase tracking-wider">
+        <p className="font-inter text-app-muted/50 text-[10px] text-center uppercase tracking-[0.1em]">
           Nur möglich solange {otherUser} noch nicht submitted hat
         </p>
       </div>

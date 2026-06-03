@@ -32,12 +32,10 @@ export default function Reveal({ user: _user, eventId, onBack }: Props) {
         ])
         setEventName(event?.name ?? '')
         const ids = (battles ?? []).map(b => b.id)
-
         const [{ data: allScores }, { data: allVerdicts }] = await Promise.all([
           supabase.from('scores').select('*').in('battle_id', ids),
           supabase.from('battle_verdicts').select('*').in('battle_id', ids),
         ])
-
         setReveals((battles ?? []).map(battle => ({
           battle,
           scores: {
@@ -56,18 +54,18 @@ export default function Reveal({ user: _user, eventId, onBack }: Props) {
   }, [eventId])
 
   if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <p className="text-zinc-600">Lade Reveal…</p>
+    <div className="min-h-screen flex items-center justify-center">
+      <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">Lade Reveal…</p>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="sticky top-0 bg-black/95 backdrop-blur border-b border-zinc-800 px-4 py-4 flex items-center gap-3 z-10 noise-header">
-        <button onClick={onBack} className="text-zinc-400 text-xl w-8">←</button>
+    <div className="min-h-screen">
+      <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 flex items-center gap-3 z-10 noise-header">
+        <button onClick={onBack} className="text-app-muted text-xl w-8">←</button>
         <div>
-          <p className="text-zinc-500 text-xs uppercase tracking-widest">Reveal</p>
-          <h1 className="text-lg font-black uppercase tracking-tight">{eventName}</h1>
+          <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">Reveal</p>
+          <h1 className="font-bebas text-xl text-app-text tracking-wider">{eventName}</h1>
         </div>
       </div>
 
@@ -76,10 +74,8 @@ export default function Reveal({ user: _user, eventId, onBack }: Props) {
           <div key={battle.id} className="flex flex-col gap-3">
             {/* Battle header */}
             <div className="text-center py-2">
-              <p className="text-zinc-600 text-xs uppercase tracking-widest">{battle.format}</p>
-              <h2 className="text-yellow-400 font-black text-xl uppercase tracking-tight">
-                {battle.mc1} vs {battle.mc2}
-              </h2>
+              <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">{battle.format}</p>
+              <h2 className="font-bebas text-2xl text-primary tracking-wider">{battle.mc1} vs {battle.mc2}</h2>
             </div>
 
             {[1, 2, 3].map(round => {
@@ -89,9 +85,9 @@ export default function Reveal({ user: _user, eventId, onBack }: Props) {
               const winnersAgree = benR.round_winner === loeweR.round_winner
 
               return (
-                <div key={round} className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
-                  <div className="px-4 py-2.5 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between">
-                    <span className="text-yellow-400 text-xs font-black uppercase tracking-widest">Runde {round}</span>
+                <div key={round} className="card rounded-lg overflow-hidden">
+                  <div className="px-4 py-2.5 bg-white/5 border-b border-white/5 flex items-center justify-between">
+                    <span className="font-bebas text-primary tracking-widest">Runde {round}</span>
                   </div>
 
                   <div className="px-4 py-3 flex flex-col gap-3">
@@ -100,30 +96,35 @@ export default function Reveal({ user: _user, eventId, onBack }: Props) {
                       const bMc2 = benR[`${cat.key}_mc2` as keyof Score] as number
                       const lMc1 = loeweR[`${cat.key}_mc1` as keyof Score] as number
                       const lMc2 = loeweR[`${cat.key}_mc2` as keyof Score] as number
-
                       const benDoubled = benR.double_down_category === cat.key
                       const loeweDoubled = loeweR.double_down_category === cat.key
 
                       return (
                         <div key={cat.key}>
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-xs font-black uppercase tracking-wider text-zinc-500">{cat.label}</p>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted">{cat.label}</p>
                             {(benDoubled || loeweDoubled) && (
-                              <span className="text-xs font-black text-yellow-400 bg-yellow-400/10 px-1.5 rounded">2×</span>
+                              <span className="font-bebas text-[10px] text-primary bg-primary/10 px-1.5 rounded tracking-wider">2×</span>
                             )}
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-zinc-800 rounded px-3 py-1.5 text-xs">
-                              <span className="text-zinc-500">{battle.mc1}: </span>
-                              <span className="text-white font-bold">Ben: {bMc1}</span>
-                              <span className="text-zinc-600"> · </span>
-                              <span className="text-white font-bold">Löwe: {lMc1}</span>
+                            {/* MC1 row */}
+                            <div className="bg-white/5 rounded px-3 py-1.5">
+                              <p className="font-inter text-[9px] text-app-muted mb-0.5 truncate">{battle.mc1}</p>
+                              <p className="font-inter text-xs">
+                                <span className="text-primary font-bold">Ben: {bMc1}</span>
+                                <span className="text-app-muted"> · </span>
+                                <span className="text-secondary font-bold">Löwe: {lMc1}</span>
+                              </p>
                             </div>
-                            <div className="bg-zinc-800 rounded px-3 py-1.5 text-xs">
-                              <span className="text-zinc-500">{battle.mc2}: </span>
-                              <span className="text-white font-bold">Ben: {bMc2}</span>
-                              <span className="text-zinc-600"> · </span>
-                              <span className="text-white font-bold">Löwe: {lMc2}</span>
+                            {/* MC2 row */}
+                            <div className="bg-white/5 rounded px-3 py-1.5">
+                              <p className="font-inter text-[9px] text-app-muted mb-0.5 truncate">{battle.mc2}</p>
+                              <p className="font-inter text-xs">
+                                <span className="text-primary font-bold">Ben: {bMc2}</span>
+                                <span className="text-app-muted"> · </span>
+                                <span className="text-secondary font-bold">Löwe: {lMc2}</span>
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -131,36 +132,36 @@ export default function Reveal({ user: _user, eventId, onBack }: Props) {
                     })}
                   </div>
 
-                  {/* Round winner */}
-                  <div className={`px-4 py-3 border-t border-zinc-800 ${winnersAgree ? 'bg-green-900/20' : 'bg-amber-900/20'}`}>
+                  {/* Round winner comparison */}
+                  <div className={`px-4 py-3 border-t border-white/5 ${winnersAgree ? 'bg-secondary/10' : 'bg-accent/10'}`}>
                     <div className="grid grid-cols-3 items-center text-center">
                       <div>
-                        <p className="text-zinc-600 text-xs uppercase mb-0.5">Ben</p>
-                        <p className="text-sm font-black text-white">{winnerLabel(benR.round_winner, battle.mc1, battle.mc2)}</p>
+                        <p className="font-inter text-[9px] text-primary uppercase mb-0.5">Ben</p>
+                        <p className="font-bebas text-base text-app-text tracking-wider">{winnerLabel(benR.round_winner, battle.mc1, battle.mc2)}</p>
                       </div>
-                      <span className={`text-xs font-black uppercase tracking-wider ${winnersAgree ? 'text-green-400' : 'text-amber-400'}`}>
+                      <span className={`font-inter text-[10px] font-bold uppercase tracking-[0.1em] ${winnersAgree ? 'text-secondary' : 'text-accent'}`}>
                         {winnersAgree ? 'Einig ✓' : 'Diskussion!'}
                       </span>
                       <div>
-                        <p className="text-zinc-600 text-xs uppercase mb-0.5">Löwe</p>
-                        <p className="text-sm font-black text-white">{winnerLabel(loeweR.round_winner, battle.mc1, battle.mc2)}</p>
+                        <p className="font-inter text-[9px] text-secondary uppercase mb-0.5">Löwe</p>
+                        <p className="font-bebas text-base text-app-text tracking-wider">{winnerLabel(loeweR.round_winner, battle.mc1, battle.mc2)}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Round comments */}
                   {(benR.round_comment || loeweR.round_comment) && (
-                    <div className="px-4 pb-3 border-t border-zinc-800 pt-3 flex flex-col gap-2">
+                    <div className="px-4 pb-3 pt-3 border-t border-white/5 flex flex-col gap-2">
                       {benR.round_comment && (
-                        <div className="bg-zinc-800 rounded px-3 py-2">
-                          <p className="text-zinc-500 text-xs uppercase font-bold mb-0.5">Ben</p>
-                          <p className="text-zinc-300 text-sm">{benR.round_comment}</p>
+                        <div className="bg-white/5 rounded px-3 py-2">
+                          <p className="font-inter text-[9px] text-primary uppercase font-bold mb-0.5">Ben</p>
+                          <p className="font-inter text-app-muted text-sm">{benR.round_comment}</p>
                         </div>
                       )}
                       {loeweR.round_comment && (
-                        <div className="bg-zinc-800 rounded px-3 py-2">
-                          <p className="text-zinc-500 text-xs uppercase font-bold mb-0.5">Löwe</p>
-                          <p className="text-zinc-300 text-sm">{loeweR.round_comment}</p>
+                        <div className="bg-white/5 rounded px-3 py-2">
+                          <p className="font-inter text-[9px] text-secondary uppercase font-bold mb-0.5">Löwe</p>
+                          <p className="font-inter text-app-muted text-sm">{loeweR.round_comment}</p>
                         </div>
                       )}
                     </div>
@@ -173,19 +174,19 @@ export default function Reveal({ user: _user, eventId, onBack }: Props) {
             {verdicts.Ben && verdicts.Löwe && (() => {
               const agree = verdicts.Ben.overall_winner === verdicts.Löwe.overall_winner
               return (
-                <div className={`rounded-lg border p-4 ${agree ? 'bg-green-900/20 border-green-800' : 'bg-amber-900/20 border-amber-700'}`}>
-                  <p className="text-xs font-black uppercase tracking-widest text-zinc-500 text-center mb-3">Gesamtsieger</p>
+                <div className={`card rounded-lg p-4 ${agree ? 'border-secondary/30' : 'border-accent/30'}`}>
+                  <p className="font-inter text-[10px] uppercase tracking-[0.15em] text-app-muted text-center mb-3">Gesamtsieger</p>
                   <div className="grid grid-cols-3 items-center text-center">
                     <div>
-                      <p className="text-zinc-600 text-xs uppercase mb-0.5">Ben</p>
-                      <p className="font-black text-white">{winnerLabel(verdicts.Ben.overall_winner, battle.mc1, battle.mc2)}</p>
+                      <p className="font-inter text-[9px] text-primary uppercase mb-0.5">Ben</p>
+                      <p className="font-bebas text-lg text-app-text tracking-wider">{winnerLabel(verdicts.Ben.overall_winner, battle.mc1, battle.mc2)}</p>
                     </div>
-                    <span className={`text-sm font-black uppercase tracking-wider ${agree ? 'text-green-400' : 'text-amber-400'}`}>
+                    <span className={`font-inter text-xs font-bold uppercase tracking-[0.1em] ${agree ? 'text-secondary' : 'text-accent'}`}>
                       {agree ? 'Einig! ✓' : 'Diskussion!'}
                     </span>
                     <div>
-                      <p className="text-zinc-600 text-xs uppercase mb-0.5">Löwe</p>
-                      <p className="font-black text-white">{winnerLabel(verdicts.Löwe.overall_winner, battle.mc1, battle.mc2)}</p>
+                      <p className="font-inter text-[9px] text-secondary uppercase mb-0.5">Löwe</p>
+                      <p className="font-bebas text-lg text-app-text tracking-wider">{winnerLabel(verdicts.Löwe.overall_winner, battle.mc1, battle.mc2)}</p>
                     </div>
                   </div>
                 </div>
@@ -195,17 +196,17 @@ export default function Reveal({ user: _user, eventId, onBack }: Props) {
             {/* Battle comments */}
             {(verdicts.Ben?.battle_comment || verdicts.Löwe?.battle_comment) && (
               <div className="flex flex-col gap-2">
-                <p className="text-xs font-black uppercase tracking-widest text-zinc-600">Battle-Fazit</p>
+                <p className="font-inter text-[10px] uppercase tracking-[0.15em] text-app-muted">Battle-Fazit</p>
                 {verdicts.Ben?.battle_comment && (
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3">
-                    <p className="text-zinc-500 text-xs uppercase font-bold mb-1">Ben</p>
-                    <p className="text-zinc-300 text-sm">{verdicts.Ben.battle_comment}</p>
+                  <div className="card rounded-lg px-4 py-3">
+                    <p className="font-inter text-[9px] text-primary uppercase font-bold mb-1">Ben</p>
+                    <p className="font-inter text-app-muted text-sm">{verdicts.Ben.battle_comment}</p>
                   </div>
                 )}
                 {verdicts.Löwe?.battle_comment && (
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3">
-                    <p className="text-zinc-500 text-xs uppercase font-bold mb-1">Löwe</p>
-                    <p className="text-zinc-300 text-sm">{verdicts.Löwe.battle_comment}</p>
+                  <div className="card rounded-lg px-4 py-3">
+                    <p className="font-inter text-[9px] text-secondary uppercase font-bold mb-1">Löwe</p>
+                    <p className="font-inter text-app-muted text-sm">{verdicts.Löwe.battle_comment}</p>
                   </div>
                 )}
               </div>
