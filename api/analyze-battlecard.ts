@@ -1,5 +1,33 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
+function extractJson(text: string): unknown | null {
+  // 1. Entferne Markdown-Code-Blöcke (```json ... ``` oder ``` ... ```)
+  let cleaned = text.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '')
+
+  // 2. Schneide alles vor dem ersten { und nach dem letzten } ab
+  const start = cleaned.indexOf('{')
+  const end = cleaned.lastIndexOf('}')
+  if (start === -1 || end === -1 || end < start) return null
+  cleaned = cleaned.slice(start, end + 1)
+
+  // 3. Ersetze häufige Claude-Artefakte: trailing commas vor } oder ]
+  cleaned = cleaned
+    .replace(/,\s*([}\]])/g, '$1')  // trailing commas
+    .replace(/[“”]/g, '"') // typografische Anführungszeichen → "
+    .replace(/[‘’]/g, "'") // typografische Apostrophe → '
+
+  try {
+    return JSON.parse(cleaned)
+  } catch (e) {
+    // 4. Letzter Versuch: JSON5-ähnlich — einfache Anführungszeichen ersetzen
+    try {
+      return JSON.parse(cleaned.replace(/'/g, '"'))
+    } catch {
+      return null
+    }
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers für lokale Entwicklung
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -67,14 +95,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = JSON.parse(responseText) as { content: { type: string; text: string }[] }
-    const text = data.content?.[0]?.text ?? ''
-    const match = text.match(/\{[\s\S]*\}/)
-    if (!match) {
-      console.error('[analyze-battlecard] Kein JSON gefunden in:', text)
-      return res.status(500).json({ error: 'Kein JSON in der Antwort', raw: text.slice(0, 200) })
+    const raw = data.content?.[0]?.text ?? ''
+    console.log('[analyze-battlecard] Claude raw text:', raw.slice(0, 300))
+
+    const parsed = extractJson(raw)
+    if (!parsed) {
+      console.error('[analyze-battlecard] Kein JSON extrahierbar aus:', raw)
+      return res.status(500).json({ error: 'Kein JSON in der Antwort', raw: raw.slice(0, 300) })
     }
 
-    return res.status(200).json(JSON.parse(match[0]))
+    return res.status(200).json(parsed)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[analyze-battlecard] Unerwarteter Fehler:', msg)
