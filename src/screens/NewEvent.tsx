@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth, useIsSuperAdmin } from '../context/AuthContext'
 
@@ -58,14 +58,18 @@ async function analyzeBattlecard(file: File): Promise<{
 export default function NewEvent() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
-  const { user, loading: authLoading } = useAuth()
+  const currentPath = useLocation().pathname
+  const isFromBackoffice = currentPath.startsWith('/backoffice')
+  const { user, profile, loading: authLoading } = useAuth()
   const isSuperAdmin = useIsSuperAdmin()
+  const showPublishing = isSuperAdmin && !roomId
+  const canAccess = isSuperAdmin || (profile?.role === 'group_admin' && !!roomId)
 
   useEffect(() => {
-    if (!authLoading && !isSuperAdmin) {
+    if (!authLoading && !canAccess) {
       navigate(roomId ? `/room/${roomId}` : '/', { replace: true })
     }
-  }, [authLoading, isSuperAdmin, navigate, roomId])
+  }, [authLoading, canAccess, navigate, roomId])
 
   const [name, setName] = useState('')
   const [date, setDate] = useState('')
@@ -73,6 +77,25 @@ export default function NewEvent() {
   const [battles, setBattles] = useState<BattleInput[]>([{ mc1: '', mc2: '', format: '1v1' }])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [publishAll, setPublishAll] = useState(true)
+  const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(new Set())
+  const [publishRooms, setPublishRooms] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    if (!showPublishing) return
+    supabase.from('rooms').select('id, name').order('name')
+      .then(({ data }) => setPublishRooms((data ?? []) as { id: string; name: string }[]))
+  }, [showPublishing])
+
+  const toggleRoom = (rid: string) => {
+    setSelectedRoomIds(prev => {
+      const next = new Set(prev)
+      if (next.has(rid)) next.delete(rid)
+      else next.add(rid)
+      return next
+    })
+  }
 
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
@@ -152,14 +175,22 @@ export default function NewEvent() {
       )
       if (battlesError) throw battlesError
 
-      if (roomId) {
+      if (showPublishing) {
+        const targetIds = publishAll ? publishRooms.map(r => r.id) : [...selectedRoomIds]
+        if (targetIds.length > 0) {
+          await supabase.from('room_events').upsert(
+            targetIds.map(rid => ({ room_id: rid, event_id: event.id, added_by: user?.id ?? null })),
+            { onConflict: 'room_id,event_id' }
+          )
+        }
+      } else if (roomId) {
         await supabase.from('room_events').upsert(
           { room_id: roomId, event_id: event.id, added_by: user?.id ?? null },
           { onConflict: 'room_id,event_id' }
         )
       }
 
-      navigate(roomId ? `/room/${roomId}` : '/', { replace: true })
+      navigate(roomId ? `/room/${roomId}` : isFromBackoffice ? '/backoffice' : '/', { replace: true })
     } catch {
       setError('Fehler beim Speichern. Bitte erneut versuchen.')
       setSaving(false)
@@ -261,6 +292,42 @@ export default function NewEvent() {
             + Battle hinzufügen
           </button>
         </div>
+
+        {/* Publizieren (nur super_admin ohne roomId) */}
+        {showPublishing && (
+          <div className="flex flex-col gap-3">
+            <label className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted">Publizieren</label>
+            <div className="flex gap-2">
+              {(['all', 'select'] as const).map(mode => (
+                <button key={mode} onClick={() => setPublishAll(mode === 'all')}
+                  className={`flex-1 py-2 rounded font-bebas tracking-[1px] text-sm transition-colors ${publishAll === (mode === 'all') ? 'bg-primary text-white' : 'bg-white/10 text-app-muted'}`}>
+                  {mode === 'all' ? 'Alle Gruppen' : 'Auswählen'}
+                </button>
+              ))}
+            </div>
+            {publishAll ? (
+              publishRooms.length > 0 && (
+                <p className="font-inter text-[10px] text-app-muted/60 uppercase tracking-[0.1em]">
+                  Wird in {publishRooms.length} {publishRooms.length === 1 ? 'Gruppe' : 'Gruppen'} publiziert
+                </p>
+              )
+            ) : (
+              <div className="flex flex-col gap-2">
+                {publishRooms.length === 0 ? (
+                  <p className="font-inter text-app-muted text-xs text-center py-2">Noch keine Gruppen vorhanden.</p>
+                ) : publishRooms.map(room => (
+                  <button key={room.id} onClick={() => toggleRoom(room.id)}
+                    className={`card rounded-lg px-4 py-3 flex items-center gap-3 text-left w-full active:scale-95 transition-transform ${selectedRoomIds.has(room.id) ? 'border-primary/40' : ''}`}>
+                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${selectedRoomIds.has(room.id) ? 'bg-primary border-primary' : 'border-white/30'}`}>
+                      {selectedRoomIds.has(room.id) && <span className="text-white font-inter text-[10px] leading-none">✓</span>}
+                    </div>
+                    <span className="font-bebas text-base text-app-text tracking-wider">{room.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {error && <div className="card border-red-800/50 rounded-lg p-3 text-red-400 font-inter text-sm">{error}</div>}
       </div>

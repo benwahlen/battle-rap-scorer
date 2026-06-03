@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth, useIsSuperAdmin } from '../context/AuthContext'
-import type { UserRole } from '../types'
+import type { UserRole, Battle } from '../types'
 
 type Tab = 'users' | 'events' | 'rooms'
 
@@ -170,28 +170,45 @@ function EventsTab() {
   const [events, setEvents] = useState<EventRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [battlesMap, setBattlesMap] = useState<Record<string, Battle[]>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     const [{ data: evData, error: evErr }, { data: reData }] = await Promise.all([
-      supabase.from('events').select('id, name, date, location, created_at').order('created_at', { ascending: false }),
-      supabase.from('room_events').select('event_id'),
+      supabase.from('events').select('id, name, date, location, room_id, created_at').order('created_at', { ascending: false }),
+      supabase.from('room_events').select('event_id, room_id'),
     ])
     if (evErr) { setError('Fehler beim Laden.'); setLoading(false); return }
 
-    const counts = (reData ?? []).reduce((acc: Record<string, number>, re: { event_id: string }) => {
-      acc[re.event_id] = (acc[re.event_id] ?? 0) + 1
+    // Count rooms per event: from room_events (new) + legacy room_id (old), deduplicated
+    const reByEvent = (reData ?? []).reduce((acc: Record<string, Set<string>>, re: { event_id: string; room_id: string }) => {
+      if (!acc[re.event_id]) acc[re.event_id] = new Set()
+      acc[re.event_id].add(re.room_id)
       return acc
-    }, {})
+    }, {} as Record<string, Set<string>>)
 
     setEvents(
-      (evData ?? []).map((e: Omit<EventRow, 'roomCount'>) => ({ ...e, roomCount: counts[e.id] ?? 0 }))
+      (evData ?? []).map((e: { id: string; name: string; date: string | null; location: string | null; room_id: string | null; created_at: string }) => {
+        const roomsSet = new Set(reByEvent[e.id] ?? [])
+        if (e.room_id && !roomsSet.has(e.room_id)) roomsSet.add(e.room_id)
+        return { id: e.id, name: e.name, date: e.date, location: e.location, created_at: e.created_at, roomCount: roomsSet.size }
+      })
     )
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const toggleEvent = async (eventId: string) => {
+    if (expandedId === eventId) { setExpandedId(null); return }
+    setExpandedId(eventId)
+    if (!battlesMap[eventId]) {
+      const { data } = await supabase.from('battles').select('*').eq('event_id', eventId).order('position')
+      setBattlesMap(prev => ({ ...prev, [eventId]: (data ?? []) as Battle[] }))
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -206,8 +223,11 @@ function EventsTab() {
       {error && <p className="font-inter text-red-400 text-sm">{error}</p>}
 
       {events.map(event => (
-        <div key={event.id} className="card rounded-lg p-4">
-          <div className="flex items-start justify-between gap-3">
+        <div key={event.id} className="card rounded-lg overflow-hidden">
+          <button
+            onClick={() => toggleEvent(event.id)}
+            className="w-full p-4 flex items-start justify-between gap-3 text-left active:bg-white/5 transition-colors"
+          >
             <div className="flex-1 min-w-0">
               <h2 className="font-bebas text-lg text-app-text truncate tracking-wider leading-tight">{event.name}</h2>
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -216,10 +236,35 @@ function EventsTab() {
                 {event.location && <span className="font-inter text-app-muted text-xs">{event.location}</span>}
               </div>
             </div>
-            <span className="font-inter text-[10px] text-app-muted/60 uppercase tracking-[0.1em] flex-shrink-0 mt-1">
-              {event.roomCount} {event.roomCount === 1 ? 'Gruppe' : 'Gruppen'}
-            </span>
-          </div>
+            <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
+              <span className="font-inter text-[10px] text-app-muted/60 uppercase tracking-[0.1em]">
+                {event.roomCount} {event.roomCount === 1 ? 'Gruppe' : 'Gruppen'}
+              </span>
+              <span className="text-app-muted text-xs">{expandedId === event.id ? '▲' : '▾'}</span>
+            </div>
+          </button>
+
+          {expandedId === event.id && (
+            <div className="border-t border-white/5 px-4 py-3 flex flex-col gap-2">
+              {!battlesMap[event.id] ? (
+                <div className="flex justify-center py-3">
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : battlesMap[event.id].length === 0 ? (
+                <p className="font-inter text-app-muted text-xs text-center py-2">Keine Battles vorhanden.</p>
+              ) : (
+                battlesMap[event.id].map((battle, i) => (
+                  <div key={battle.id} className="flex items-center gap-2">
+                    <span className="font-inter text-[10px] text-app-muted/60 w-5 flex-shrink-0">{i + 1}.</span>
+                    <span className="font-bebas text-sm text-app-text tracking-wider flex-1 truncate">{battle.mc1}</span>
+                    <span className="font-inter text-app-muted/60 text-[10px] flex-shrink-0">vs</span>
+                    <span className="font-bebas text-sm text-app-text tracking-wider flex-1 truncate text-right">{battle.mc2}</span>
+                    <span className="font-inter text-[10px] text-app-muted/60 w-7 text-right flex-shrink-0">{battle.format}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       ))}
 

@@ -137,22 +137,24 @@ export default function RoomDetail() {
           <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">Gruppe</p>
           <h1 className="font-bebas text-xl text-app-text tracking-wider truncate leading-none">{room?.name ?? '…'}</h1>
         </div>
-        {isSuperAdmin && (
-          <button
-            onClick={() => navigate(`/room/${roomId}/new-event`)}
-            className="bg-primary font-bebas text-white text-xs px-3 py-1.5 rounded tracking-[2px] active:scale-95 transition-transform"
-          >
-            + Event
-          </button>
-        )}
-        {!isSuperAdmin && isRoomAdmin && (
-          <button
-            onClick={() => navigate(`/event-pool/${roomId}`)}
-            className="bg-secondary font-bebas text-black text-xs px-3 py-1.5 rounded tracking-[2px] active:scale-95 transition-transform"
-          >
-            Events hinzufügen
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {(isSuperAdmin || profile?.role === 'group_admin') && (
+            <button
+              onClick={() => navigate(`/room/${roomId}/new-event`)}
+              className="bg-primary font-bebas text-white text-xs px-3 py-1.5 rounded tracking-[2px] active:scale-95 transition-transform"
+            >
+              + Event
+            </button>
+          )}
+          {isRoomAdmin && !isSuperAdmin && (
+            <button
+              onClick={() => navigate(`/event-pool/${roomId}`)}
+              className="bg-secondary font-bebas text-black text-xs px-3 py-1.5 rounded tracking-[2px] active:scale-95 transition-transform whitespace-nowrap"
+            >
+              + Pool
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="p-4 flex flex-col gap-5">
