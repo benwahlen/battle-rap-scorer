@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { UserName } from './types'
-import UserSelect from './screens/UserSelect'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import AuthScreen from './screens/AuthScreen'
 import EventList from './screens/EventList'
 import NewEvent from './screens/NewEvent'
 import BattleOverview from './screens/BattleOverview'
@@ -8,7 +8,6 @@ import WaitScreen from './screens/WaitScreen'
 import Reveal from './screens/Reveal'
 
 type Screen =
-  | { name: 'user-select' }
   | { name: 'event-list' }
   | { name: 'new-event' }
   | { name: 'battle-overview'; eventId: string }
@@ -17,25 +16,19 @@ type Screen =
 
 type EventStatus = 'unrated' | 'waiting' | 'reveal'
 
-function App() {
-  const [user, setUser] = useState<UserName | null>(() =>
-    localStorage.getItem('user') as UserName | null
-  )
-  const [screen, setScreen] = useState<Screen>(
-    localStorage.getItem('user') ? { name: 'event-list' } : { name: 'user-select' }
-  )
+function AppInner() {
+  const { user, profile, loading, signOut } = useAuth()
+  const [screen, setScreen] = useState<Screen>({ name: 'event-list' })
 
-  const handleUserSelect = (name: UserName) => {
-    localStorage.setItem('user', name)
-    setUser(name)
-    setScreen({ name: 'event-list' })
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('user')
-    setUser(null)
-    setScreen({ name: 'user-select' })
-  }
+  if (!user || !profile) return <AuthScreen />
 
   const handleOpenEvent = (eventId: string, status: EventStatus) => {
     if (status === 'reveal') setScreen({ name: 'reveal', eventId })
@@ -43,19 +36,13 @@ function App() {
     else setScreen({ name: 'battle-overview', eventId })
   }
 
-  if (screen.name === 'user-select') {
-    return <UserSelect onSelect={handleUserSelect} />
-  }
-
-  if (!user) return null
-
   if (screen.name === 'event-list') {
     return (
       <EventList
-        user={user}
+        displayName={profile.display_name}
         onNewEvent={() => setScreen({ name: 'new-event' })}
         onOpenEvent={handleOpenEvent}
-        onLogout={handleLogout}
+        onLogout={signOut}
       />
     )
   }
@@ -72,7 +59,7 @@ function App() {
   if (screen.name === 'battle-overview') {
     return (
       <BattleOverview
-        user={user}
+        displayName={profile.display_name}
         eventId={screen.eventId}
         onBack={() => setScreen({ name: 'event-list' })}
         onSubmitted={otherDone =>
@@ -88,7 +75,7 @@ function App() {
   if (screen.name === 'wait') {
     return (
       <WaitScreen
-        user={user}
+        displayName={profile.display_name}
         eventId={screen.eventId}
         onBothDone={() => setScreen({ name: 'reveal', eventId: screen.eventId })}
         onBack={() => setScreen({ name: 'event-list' })}
@@ -100,7 +87,7 @@ function App() {
   if (screen.name === 'reveal') {
     return (
       <Reveal
-        user={user}
+        displayName={profile.display_name}
         eventId={screen.eventId}
         onBack={() => setScreen({ name: 'event-list' })}
       />
@@ -110,4 +97,10 @@ function App() {
   return null
 }
 
-export default App
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  )
+}

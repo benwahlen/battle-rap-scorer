@@ -46,9 +46,6 @@ export interface BattleVerdict {
   submitted_at: string
 }
 
-export const USERS = ['Ben', 'Löwe'] as const
-export type UserName = typeof USERS[number]
-
 export const CATEGORIES = [
   { key: 'bars', label: 'BARS / TEXT' },
   { key: 'personalisierung', label: 'PERSONALISIERUNG' },

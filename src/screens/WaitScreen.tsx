@@ -1,17 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import type { UserName } from '../types'
-
 interface Props {
-  user: UserName
+  displayName: string
   eventId: string
   onBothDone: () => void
   onBack: () => void
   onEdit: () => void
 }
 
-export default function WaitScreen({ user, eventId, onBothDone, onBack, onEdit }: Props) {
-  const otherUser: UserName = user === 'Ben' ? 'Löwe' : 'Ben'
+export default function WaitScreen({ displayName, eventId, onBothDone, onBack, onEdit }: Props) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const doneRef = useRef(false)
 
@@ -26,11 +23,17 @@ export default function WaitScreen({ user, eventId, onBothDone, onBack, onEdit }
     if (doneRef.current) return
     try {
       const { data: battles } = await supabase.from('battles').select('id').eq('event_id', eventId)
-      const ids = (battles ?? []).map(b => b.id)
+      const ids = (battles ?? []).map((b: { id: string }) => b.id)
       if (ids.length === 0) return
+
+      // Check if any OTHER user has completed all battles
       const { data: verdicts } = await supabase
-        .from('battle_verdicts').select('user_name').in('battle_id', ids).eq('user_name', otherUser)
-      if ((verdicts ?? []).length === ids.length) {
+        .from('battle_verdicts').select('user_name').in('battle_id', ids).neq('user_name', displayName)
+      const otherNames = [...new Set((verdicts ?? []).map((v: { user_name: string }) => v.user_name))]
+      const otherDone = otherNames.some(name =>
+        (verdicts ?? []).filter((v: { user_name: string }) => v.user_name === name).length === ids.length
+      )
+      if (otherDone) {
         doneRef.current = true
         if (intervalRef.current) clearInterval(intervalRef.current)
         onBothDone()
@@ -50,7 +53,7 @@ export default function WaitScreen({ user, eventId, onBothDone, onBack, onEdit }
         <div>
           <h2 className="font-bebas text-3xl text-app-text tracking-wider mb-2">Bewertung eingereicht!</h2>
           <p className="font-inter text-app-muted text-base">
-            Warte auf <span className="text-secondary font-bold">{otherUser}</span>…
+            Warte auf <span className="text-secondary font-bold">andere User</span>…
           </p>
         </div>
         <p className="font-inter text-app-muted/50 text-[10px] uppercase tracking-[0.15em]">
@@ -64,7 +67,7 @@ export default function WaitScreen({ user, eventId, onBothDone, onBack, onEdit }
           ✎ Bewertung bearbeiten
         </button>
         <p className="font-inter text-app-muted/50 text-[10px] text-center uppercase tracking-[0.1em]">
-          Nur möglich solange {otherUser} noch nicht submitted hat
+          Nur möglich solange andere User noch nicht submitted hat
         </p>
       </div>
     </div>

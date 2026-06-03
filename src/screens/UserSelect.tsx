@@ -1,7 +1,5 @@
-import type { UserName } from '../types'
-
 interface Props {
-  onSelect: (name: UserName) => void
+  onSelect: (name: string) => void
 }
 
 export default function UserSelect({ onSelect }: Props) {

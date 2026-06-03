@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Battle, UserName, CategoryKey } from '../types'
+import type { Battle, CategoryKey } from '../types'
 import { CATEGORIES } from '../types'
 import Stepper from '../components/Stepper'
 
@@ -69,7 +69,7 @@ function isBattleComplete(bs: BattleScore) {
 // ── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  user: UserName
+  displayName: string
   eventId: string
   onBack: () => void
   onSubmitted: (otherAlreadyDone: boolean) => void
@@ -77,7 +77,7 @@ interface Props {
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export default function BattleOverview({ user, eventId, onBack, onSubmitted }: Props) {
+export default function BattleOverview({ displayName, eventId, onBack, onSubmitted }: Props) {
   const [eventName, setEventName] = useState('')
   const [battles, setBattles] = useState<Battle[]>([])
   const [scores, setScores] = useState<Record<string, BattleScore>>({})
@@ -87,9 +87,7 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
   const [isEditing, setIsEditing] = useState(false)
   const [activeBattleId, setActiveBattleId] = useState<string | null>(null)
 
-  const otherUser: UserName = user === 'Ben' ? 'Löwe' : 'Ben'
-
-  useEffect(() => { load() }, [eventId, user]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [eventId, displayName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     try {
@@ -104,13 +102,13 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
       if (ids.length === 0) { setLoading(false); return }
 
       const { data: verdicts } = await supabase
-        .from('battle_verdicts').select('*').in('battle_id', ids).eq('user_name', user)
+        .from('battle_verdicts').select('*').in('battle_id', ids).eq('user_name', displayName)
       const alreadyDone = (verdicts?.length ?? 0) === ids.length
       let init: Record<string, BattleScore> = {}
 
       if (alreadyDone) {
         const { data: existingScores } = await supabase
-          .from('scores').select('*').in('battle_id', ids).eq('user_name', user)
+          .from('scores').select('*').in('battle_id', ids).eq('user_name', displayName)
         for (const b of list) {
           const verdict = verdicts!.find(v => v.battle_id === b.id)
           const bScores = (existingScores ?? []).filter(s => s.battle_id === b.id)
@@ -156,7 +154,7 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
         for (const round of [1, 2, 3] as const) {
           const rs = bs.rounds[round]
           const { error: e } = await supabase.from('scores').upsert({
-            battle_id: b.id, user_name: user, round_number: round,
+            battle_id: b.id, user_name: displayName, round_number: round,
             bars_mc1: rs.bars_mc1, bars_mc2: rs.bars_mc2,
             personalisierung_mc1: rs.personalisierung_mc1, personalisierung_mc2: rs.personalisierung_mc2,
             delivery_mc1: rs.delivery_mc1, delivery_mc2: rs.delivery_mc2,
@@ -168,16 +166,22 @@ export default function BattleOverview({ user, eventId, onBack, onSubmitted }: P
           if (e) throw e
         }
         const { error: ve } = await supabase.from('battle_verdicts').upsert({
-          battle_id: b.id, user_name: user,
+          battle_id: b.id, user_name: displayName,
           overall_winner: bs.overall_winner!,
           battle_comment: bs.battle_comment || null,
         }, { onConflict: 'battle_id,user_name' })
         if (ve) throw ve
       }
-      const { data: otherVerdicts } = await supabase
-        .from('battle_verdicts').select('battle_id')
-        .in('battle_id', battles.map(b => b.id)).eq('user_name', otherUser)
-      onSubmitted((otherVerdicts ?? []).length === battles.length)
+      // Check if any OTHER user has already completed all battles
+      const { data: allOtherVerdicts } = await supabase
+        .from('battle_verdicts').select('battle_id, user_name')
+        .in('battle_id', battles.map(b => b.id))
+        .neq('user_name', displayName)
+      const otherNames = [...new Set((allOtherVerdicts ?? []).map((v: { user_name: string }) => v.user_name))]
+      const otherDone = otherNames.some(name =>
+        (allOtherVerdicts ?? []).filter((v: { user_name: string }) => v.user_name === name).length === battles.length
+      )
+      onSubmitted(otherDone)
     } catch {
       setError('Fehler beim Einreichen. Bitte erneut versuchen.')
       setSubmitting(false)

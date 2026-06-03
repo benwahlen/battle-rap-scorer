@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Event, UserName } from '../types'
+import type { Event } from '../types'
 
 type EventStatus = 'unrated' | 'waiting' | 'reveal'
 
@@ -10,18 +10,16 @@ interface EventWithStatus extends Event {
 }
 
 interface Props {
-  user: UserName
+  displayName: string
   onNewEvent: () => void
   onOpenEvent: (eventId: string, status: EventStatus) => void
   onLogout: () => void
 }
 
-export default function EventList({ user, onNewEvent, onOpenEvent, onLogout }: Props) {
+export default function EventList({ displayName, onNewEvent, onOpenEvent, onLogout }: Props) {
   const [events, setEvents] = useState<EventWithStatus[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const otherUser: UserName = user === 'Ben' ? 'Löwe' : 'Ben'
 
   const loadEvents = useCallback(async () => {
     setLoading(true)
@@ -35,14 +33,26 @@ export default function EventList({ user, onNewEvent, onOpenEvent, onLogout }: P
         (eventsData ?? []).map(async (event) => {
           const { data: battles } = await supabase
             .from('battles').select('id').eq('event_id', event.id)
-          const battleIds = (battles ?? []).map(b => b.id)
+          const battleIds = (battles ?? []).map((b: { id: string }) => b.id)
           const battleCount = battleIds.length
           if (battleCount === 0) return { ...event, battleCount: 0, status: 'unrated' as EventStatus }
 
           const { data: verdicts } = await supabase
             .from('battle_verdicts').select('battle_id, user_name').in('battle_id', battleIds)
-          const myDone = (verdicts ?? []).filter(v => v.user_name === user).length === battleCount
-          const otherDone = (verdicts ?? []).filter(v => v.user_name === otherUser).length === battleCount
+
+          const allVerdicts = verdicts ?? []
+          const myDone = allVerdicts.filter((v: { user_name: string }) => v.user_name === displayName).length === battleCount
+
+          // Check if any other user has completed all battles
+          const otherUserNames = [...new Set(
+            allVerdicts
+              .filter((v: { user_name: string }) => v.user_name !== displayName)
+              .map((v: { user_name: string }) => v.user_name)
+          )]
+          const otherDone = otherUserNames.some(name =>
+            allVerdicts.filter((v: { user_name: string }) => v.user_name === name).length === battleCount
+          )
+
           const status: EventStatus = myDone && otherDone ? 'reveal' : myDone ? 'waiting' : 'unrated'
           return { ...event, battleCount, status }
         })
@@ -53,7 +63,7 @@ export default function EventList({ user, onNewEvent, onOpenEvent, onLogout }: P
     } finally {
       setLoading(false)
     }
-  }, [user, otherUser])
+  }, [displayName])
 
   useEffect(() => { loadEvents() }, [loadEvents])
 
@@ -61,7 +71,7 @@ export default function EventList({ user, onNewEvent, onOpenEvent, onLogout }: P
     if (status === 'reveal')
       return <span className="font-inter text-[10px] bg-accent/20 text-accent px-2.5 py-1 rounded uppercase tracking-[0.1em]">🔓 Reveal</span>
     if (status === 'waiting')
-      return <span className="font-inter text-[10px] bg-secondary/20 text-secondary px-2.5 py-1 rounded uppercase tracking-[0.1em]">⏳ {otherUser}</span>
+      return <span className="font-inter text-[10px] bg-secondary/20 text-secondary px-2.5 py-1 rounded uppercase tracking-[0.1em]">⏳ Wartet</span>
     return <span className="font-inter text-[10px] bg-primary/20 text-primary px-2.5 py-1 rounded uppercase tracking-[0.1em]">Ausstehend</span>
   }
 
@@ -69,7 +79,7 @@ export default function EventList({ user, onNewEvent, onOpenEvent, onLogout }: P
     <div className="min-h-screen">
       <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 flex items-center justify-between z-10 noise-header">
         <div>
-          <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">{user}</p>
+          <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">{displayName}</p>
           <h1 className="font-bebas text-2xl text-app-text tracking-wider leading-none">Battle Rap Scorer</h1>
         </div>
         <div className="flex items-center gap-2">
@@ -102,7 +112,6 @@ export default function EventList({ user, onNewEvent, onOpenEvent, onLogout }: P
             <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.1em] mt-2">Tippe „+ Event" um loszulegen</p>
           </div>
         )}
-
         <div className="flex flex-col gap-3">
           {events.map(event => (
             <button

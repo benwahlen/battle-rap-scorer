@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Battle, UserName } from '../types'
+import type { Battle } from '../types'
 import { CATEGORIES } from '../types'
 import Stepper from '../components/Stepper'
 
@@ -36,7 +36,7 @@ const defaultBattleScore = (): BattleScore => ({
 })
 
 interface Props {
-  user: UserName
+  user: string
   eventId: string
   onBack: () => void
   onSubmitted: (otherAlreadyDone: boolean) => void
@@ -51,7 +51,7 @@ export default function ScoreScreen({ user, eventId, onBack, onSubmitted }: Prop
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const otherUser: UserName = user === 'Ben' ? 'Löwe' : 'Ben'
+  const otherUser: string = user === 'Ben' ? 'Löwe' : 'Ben'
 
   useEffect(() => {
     async function load() {
