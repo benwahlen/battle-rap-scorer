@@ -8,20 +8,20 @@ export default function UserSelect({ onSelect }: Props) {
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6">
       <div className="mb-12 text-center">
-        <div className="text-6xl mb-4">🎤</div>
-        <h1 className="text-3xl font-black text-white tracking-tight">Battle Rap Scorer</h1>
-        <p className="text-zinc-500 mt-2">Wer bist du?</p>
+        <div className="text-6xl mb-5">🎤</div>
+        <h1 className="text-4xl font-black text-white uppercase tracking-tight">Battle Rap<br/>Scorer</h1>
+        <p className="text-zinc-600 mt-3 uppercase tracking-widest text-xs">Wer bist du?</p>
       </div>
-      <div className="flex flex-col gap-4 w-full max-w-xs">
+      <div className="flex flex-col gap-3 w-full max-w-xs">
         <button
           onClick={() => onSelect('Ben')}
-          className="bg-yellow-400 text-black font-black text-2xl py-7 rounded-2xl active:scale-95 transition-transform shadow-lg shadow-yellow-400/20"
+          className="bg-yellow-400 text-black font-black text-xl py-6 rounded-lg uppercase tracking-widest active:scale-95 transition-transform shadow-lg shadow-yellow-400/20"
         >
           Ben
         </button>
         <button
           onClick={() => onSelect('Löwe')}
-          className="bg-zinc-900 text-white font-black text-2xl py-7 rounded-2xl border border-zinc-700 active:scale-95 transition-transform"
+          className="bg-zinc-900 text-white font-black text-xl py-6 rounded-lg border border-zinc-700 uppercase tracking-widest active:scale-95 transition-transform"
         >
           Löwe 🦁
         </button>

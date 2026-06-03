@@ -1,4 +1,3 @@
-// App-Datentypen (manuell — kein generierter Supabase-Typ)
 export interface Event {
   id: string
   name: string
@@ -33,6 +32,8 @@ export interface Score {
   crowd_mc1: number
   crowd_mc2: number
   round_winner: string | null
+  round_comment: string | null
+  double_down_category: string | null
   submitted_at: string
 }
 
@@ -41,6 +42,7 @@ export interface BattleVerdict {
   battle_id: string
   user_name: string
   overall_winner: string
+  battle_comment: string | null
   submitted_at: string
 }
 
@@ -48,11 +50,11 @@ export const USERS = ['Ben', 'Löwe'] as const
 export type UserName = typeof USERS[number]
 
 export const CATEGORIES = [
-  { key: 'bars', label: 'Bars / Text' },
-  { key: 'personalisierung', label: 'Personalisierung' },
-  { key: 'delivery', label: 'Delivery' },
-  { key: 'struktur', label: 'Struktur' },
-  { key: 'crowd', label: 'Crowd Reaction' },
+  { key: 'bars', label: 'BARS / TEXT' },
+  { key: 'personalisierung', label: 'PERSONALISIERUNG' },
+  { key: 'delivery', label: 'DELIVERY / PERFORMANCE' },
+  { key: 'struktur', label: 'STRUKTUR / DRAMATURGIE' },
+  { key: 'crowd', label: 'CROWD REACTION' },
 ] as const
 
 export type CategoryKey = typeof CATEGORIES[number]['key']

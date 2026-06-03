@@ -3,7 +3,7 @@ import type { UserName } from './types'
 import UserSelect from './screens/UserSelect'
 import EventList from './screens/EventList'
 import NewEvent from './screens/NewEvent'
-import ScoreScreen from './screens/ScoreScreen'
+import BattleOverview from './screens/BattleOverview'
 import WaitScreen from './screens/WaitScreen'
 import Reveal from './screens/Reveal'
 
@@ -11,7 +11,7 @@ type Screen =
   | { name: 'user-select' }
   | { name: 'event-list' }
   | { name: 'new-event' }
-  | { name: 'score'; eventId: string }
+  | { name: 'battle-overview'; eventId: string }
   | { name: 'wait'; eventId: string }
   | { name: 'reveal'; eventId: string }
 
@@ -40,7 +40,7 @@ function App() {
   const handleOpenEvent = (eventId: string, status: EventStatus) => {
     if (status === 'reveal') setScreen({ name: 'reveal', eventId })
     else if (status === 'waiting') setScreen({ name: 'wait', eventId })
-    else setScreen({ name: 'score', eventId })
+    else setScreen({ name: 'battle-overview', eventId })
   }
 
   if (screen.name === 'user-select') {
@@ -69,14 +69,17 @@ function App() {
     )
   }
 
-  if (screen.name === 'score') {
+  if (screen.name === 'battle-overview') {
     return (
-      <ScoreScreen
+      <BattleOverview
         user={user}
         eventId={screen.eventId}
         onBack={() => setScreen({ name: 'event-list' })}
-        onSubmitted={(otherDone) =>
-          setScreen(otherDone ? { name: 'reveal', eventId: screen.eventId } : { name: 'wait', eventId: screen.eventId })
+        onSubmitted={otherDone =>
+          setScreen(otherDone
+            ? { name: 'reveal', eventId: screen.eventId }
+            : { name: 'wait', eventId: screen.eventId }
+          )
         }
       />
     )
@@ -89,6 +92,7 @@ function App() {
         eventId={screen.eventId}
         onBothDone={() => setScreen({ name: 'reveal', eventId: screen.eventId })}
         onBack={() => setScreen({ name: 'event-list' })}
+        onEdit={() => setScreen({ name: 'battle-overview', eventId: screen.eventId })}
       />
     )
   }

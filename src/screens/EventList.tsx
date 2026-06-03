@@ -74,53 +74,49 @@ export default function EventList({ user, onNewEvent, onOpenEvent, onLogout }: P
 
   const statusBadge = (status: EventStatus) => {
     if (status === 'reveal')
-      return <span className="text-xs bg-purple-500/20 text-purple-400 px-2.5 py-1 rounded-full font-medium">🔓 Reveal</span>
+      return <span className="text-xs bg-purple-500/20 text-purple-400 px-2.5 py-1 rounded font-black uppercase tracking-wider">🔓 Reveal</span>
     if (status === 'waiting')
-      return <span className="text-xs bg-blue-500/20 text-blue-400 px-2.5 py-1 rounded-full font-medium">Wartet auf {otherUser}</span>
-    return <span className="text-xs bg-orange-500/20 text-orange-400 px-2.5 py-1 rounded-full font-medium">Nicht bewertet</span>
+      return <span className="text-xs bg-blue-500/20 text-blue-400 px-2.5 py-1 rounded font-black uppercase tracking-wider">⏳ {otherUser}</span>
+    return <span className="text-xs bg-orange-500/20 text-orange-400 px-2.5 py-1 rounded font-black uppercase tracking-wider">Offen</span>
   }
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="sticky top-0 bg-black/95 backdrop-blur border-b border-zinc-900 px-4 py-4 flex items-center justify-between z-10">
+      <div className="sticky top-0 bg-black/95 backdrop-blur border-b border-zinc-800 px-4 py-4 flex items-center justify-between z-10 noise-header">
         <div>
-          <h1 className="text-xl font-black">Battle Rap Scorer</h1>
-          <p className="text-zinc-500 text-sm">{user}</p>
+          <p className="text-zinc-600 text-xs uppercase tracking-widest">{user}</p>
+          <h1 className="text-xl font-black uppercase tracking-tight">Battle Rap Scorer</h1>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={onNewEvent}
-            className="bg-yellow-400 text-black font-bold text-sm px-4 py-2 rounded-xl active:scale-95 transition-transform"
+            className="bg-yellow-400 text-black font-black text-xs px-4 py-2.5 rounded uppercase tracking-wider active:scale-95 transition-transform"
           >
             + Event
           </button>
-          <button onClick={onLogout} className="text-zinc-600 text-sm px-2 py-2">
-            ↩
-          </button>
+          <button onClick={onLogout} className="text-zinc-600 text-sm px-2 py-2">↩</button>
         </div>
       </div>
 
       <div className="p-4">
         {loading && (
           <div className="flex items-center justify-center py-20">
-            <p className="text-zinc-600">Lade Events…</p>
+            <p className="text-zinc-600 uppercase tracking-wider text-xs">Lade Events…</p>
           </div>
         )}
 
         {error && (
-          <div className="bg-red-900/30 border border-red-800 rounded-xl p-4 text-red-400 text-sm mb-4">
+          <div className="bg-red-900/30 border border-red-800 rounded-lg p-4 text-red-400 text-sm mb-4">
             {error}
-            <button onClick={loadEvents} className="block mt-2 text-red-300 underline text-xs">
-              Erneut versuchen
-            </button>
+            <button onClick={loadEvents} className="block mt-2 text-red-300 underline text-xs">Erneut versuchen</button>
           </div>
         )}
 
         {!loading && !error && events.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="text-5xl mb-4">🎤</div>
-            <p className="text-zinc-400 font-medium">Noch keine Events.</p>
-            <p className="text-zinc-600 text-sm mt-1">Tippe „+ Event" um loszulegen.</p>
+            <p className="text-zinc-400 font-black uppercase tracking-tight">Noch keine Events.</p>
+            <p className="text-zinc-600 text-xs uppercase tracking-wider mt-2">Tippe „+ Event" um loszulegen.</p>
           </div>
         )}
 
@@ -129,21 +125,21 @@ export default function EventList({ user, onNewEvent, onOpenEvent, onLogout }: P
             <button
               key={event.id}
               onClick={() => onOpenEvent(event.id, event.status)}
-              className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-left active:scale-95 transition-transform w-full"
+              className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-left active:scale-95 transition-transform w-full"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <h2 className="font-bold text-white truncate text-base">{event.name}</h2>
-                  <div className="flex items-center gap-1.5 mt-0.5 text-zinc-500 text-sm flex-wrap">
+                  <h2 className="font-black text-white truncate text-base uppercase tracking-tight">{event.name}</h2>
+                  <div className="flex items-center gap-1.5 mt-0.5 text-zinc-500 text-xs flex-wrap">
                     {event.date && <span>{event.date}</span>}
                     {event.date && event.location && <span>·</span>}
                     {event.location && <span>{event.location}</span>}
                   </div>
-                  <p className="text-zinc-700 text-xs mt-1">
+                  <p className="text-zinc-700 text-xs mt-1 uppercase tracking-wider">
                     {event.battleCount} {event.battleCount === 1 ? 'Battle' : 'Battles'}
                   </p>
                 </div>
-                <div className="flex-shrink-0">{statusBadge(event.status)}</div>
+                <div className="flex-shrink-0 mt-0.5">{statusBadge(event.status)}</div>
               </div>
             </button>
           ))}
