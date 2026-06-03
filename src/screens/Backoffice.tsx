@@ -176,24 +176,29 @@ function EventsTab() {
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const [{ data: evData, error: evErr }, { data: reData }] = await Promise.all([
+    const [{ data: evData, error: evErr }, { data: reData, error: reErr }] = await Promise.all([
       supabase.from('events').select('id, name, date, location, room_id, created_at').order('created_at', { ascending: false }),
       supabase.from('room_events').select('event_id, room_id'),
     ])
     if (evErr) { setError('Fehler beim Laden.'); setLoading(false); return }
+    if (reErr) console.error('[Backoffice EventsTab] room_events query error:', reErr.code, reErr.message, reErr.hint)
+
+    console.log('[Backoffice EventsTab] events:', evData?.length, 'room_events:', reData?.length, reData?.slice(0, 3))
 
     // Count rooms per event: from room_events (new) + legacy room_id (old), deduplicated
-    const reByEvent = (reData ?? []).reduce((acc: Record<string, Set<string>>, re: { event_id: string; room_id: string }) => {
-      if (!acc[re.event_id]) acc[re.event_id] = new Set()
-      acc[re.event_id].add(re.room_id)
-      return acc
-    }, {} as Record<string, Set<string>>)
+    type RERow = { event_id: string; room_id: string }
+    const reByEvent: Record<string, string[]> = {}
+    for (const re of (reData ?? []) as RERow[]) {
+      if (!reByEvent[re.event_id]) reByEvent[re.event_id] = []
+      reByEvent[re.event_id].push(re.room_id)
+    }
 
     setEvents(
       (evData ?? []).map((e: { id: string; name: string; date: string | null; location: string | null; room_id: string | null; created_at: string }) => {
-        const roomsSet = new Set(reByEvent[e.id] ?? [])
-        if (e.room_id && !roomsSet.has(e.room_id)) roomsSet.add(e.room_id)
-        return { id: e.id, name: e.name, date: e.date, location: e.location, created_at: e.created_at, roomCount: roomsSet.size }
+        const roomIds = new Set<string>(reByEvent[e.id] ?? [])
+        if (e.room_id) roomIds.add(e.room_id)
+        console.log(`[Backoffice] "${e.name}": room_events=${reByEvent[e.id]?.length ?? 0}, room_id=${e.room_id}, total=${roomIds.size}`)
+        return { id: e.id, name: e.name, date: e.date, location: e.location, created_at: e.created_at, roomCount: roomIds.size }
       })
     )
     setLoading(false)

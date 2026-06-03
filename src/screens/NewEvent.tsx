@@ -81,11 +81,20 @@ export default function NewEvent() {
   const [publishAll, setPublishAll] = useState(true)
   const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(new Set())
   const [publishRooms, setPublishRooms] = useState<{ id: string; name: string }[]>([])
+  const [publishError, setPublishError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!showPublishing) return
     supabase.from('rooms').select('id, name').order('name')
-      .then(({ data }) => setPublishRooms((data ?? []) as { id: string; name: string }[]))
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('[NewEvent] rooms query failed:', error.code, error.message, error.details)
+          setPublishError(`Gruppen konnten nicht geladen werden: ${error.message}`)
+        } else {
+          console.log('[NewEvent] publishRooms loaded:', data?.length, 'rooms', data)
+          setPublishRooms((data ?? []) as { id: string; name: string }[])
+        }
+      })
   }, [showPublishing])
 
   const toggleRoom = (rid: string) => {
@@ -156,6 +165,7 @@ export default function NewEvent() {
 
     setSaving(true)
     setError(null)
+    setPublishError(null)
     try {
       const { data: event, error: eventError } = await supabase
         .from('events')
@@ -177,17 +187,30 @@ export default function NewEvent() {
 
       if (showPublishing) {
         const targetIds = publishAll ? publishRooms.map(r => r.id) : [...selectedRoomIds]
+        console.log('[NewEvent] Publishing attempt: publishAll=', publishAll, 'publishRooms=', publishRooms.length, 'targetIds=', targetIds)
         if (targetIds.length > 0) {
-          await supabase.from('room_events').upsert(
+          const { error: reErr } = await supabase.from('room_events').upsert(
             targetIds.map(rid => ({ room_id: rid, event_id: event.id, added_by: user?.id ?? null })),
             { onConflict: 'room_id,event_id' }
           )
+          if (reErr) {
+            console.error('[NewEvent] room_events upsert failed:', reErr.code, reErr.message, reErr.details, reErr.hint)
+            setPublishError(`Publish fehlgeschlagen (${reErr.code}): ${reErr.message}${reErr.hint ? ' — ' + reErr.hint : ''}`)
+          } else {
+            console.log('[NewEvent] room_events upsert OK for', targetIds.length, 'rooms')
+          }
+        } else {
+          console.warn('[NewEvent] targetIds empty — publishRooms:', publishRooms, 'selectedRoomIds:', [...selectedRoomIds])
+          setPublishError('Keine Gruppen ausgewählt / geladen. Supabase-Konsole prüfen.')
         }
       } else if (roomId) {
-        await supabase.from('room_events').upsert(
+        const { error: reErr } = await supabase.from('room_events').upsert(
           { room_id: roomId, event_id: event.id, added_by: user?.id ?? null },
           { onConflict: 'room_id,event_id' }
         )
+        if (reErr) {
+          console.error('[NewEvent] room_events upsert (room) failed:', reErr.code, reErr.message, reErr.hint)
+        }
       }
 
       navigate(roomId ? `/room/${roomId}` : isFromBackoffice ? '/backoffice' : '/', { replace: true })
@@ -326,6 +349,13 @@ export default function NewEvent() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {publishError && (
+          <div className="card border-red-800/50 rounded-lg p-3 font-inter text-sm">
+            <p className="text-red-400 font-semibold mb-1">Publishing-Fehler:</p>
+            <p className="text-red-300 break-all">{publishError}</p>
           </div>
         )}
 
