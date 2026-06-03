@@ -9,6 +9,7 @@ export default function CreateRoom() {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,18 +24,24 @@ export default function CreateRoom() {
         .insert({ name: name.trim(), created_by: user!.id })
         .select()
         .single()
-      if (roomErr) { console.error('[CreateRoom] rooms insert:', roomErr.code, roomErr.message, roomErr.details); throw roomErr }
+      if (roomErr) {
+        setDebugInfo(`rooms INSERT\ncode: ${roomErr.code}\nmessage: ${roomErr.message}\ndetails: ${roomErr.details ?? '–'}\nhint: ${roomErr.hint ?? '–'}`)
+        throw roomErr
+      }
 
       // Add creator as member
       const { error: memberErr } = await supabase
         .from('room_members')
         .insert({ room_id: room.id, user_id: user!.id })
-      if (memberErr) { console.error('[CreateRoom] room_members insert:', memberErr.code, memberErr.message, memberErr.details); throw memberErr }
+      if (memberErr) {
+        setDebugInfo(`room_members INSERT\ncode: ${memberErr.code}\nmessage: ${memberErr.message}\ndetails: ${memberErr.details ?? '–'}\nhint: ${memberErr.hint ?? '–'}`)
+        throw memberErr
+      }
 
       navigate(`/room/${room.id}`, { replace: true })
     } catch (e) {
-      console.error('[CreateRoom] caught:', e)
-      setError('Fehler beim Erstellen. Bitte erneut versuchen.')
+      const msg = e instanceof Error ? e.message : JSON.stringify(e)
+      setError(msg)
       setSaving(false)
     }
   }
@@ -62,7 +69,14 @@ export default function CreateRoom() {
             />
           </div>
 
-          {error && <p className="font-inter text-red-400 text-sm">{error}</p>}
+          {(error || debugInfo) && (
+            <div className="bg-red-950 border border-red-700 rounded-lg p-4 flex flex-col gap-2">
+              {error && <p className="font-inter text-red-300 text-sm font-bold">{error}</p>}
+              {debugInfo && (
+                <pre className="font-mono text-red-400 text-xs whitespace-pre-wrap break-all">{debugInfo}</pre>
+              )}
+            </div>
+          )}
 
           <button
             type="submit"
