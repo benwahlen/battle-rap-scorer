@@ -11,6 +11,7 @@ interface RoomWithMeta extends Room {
 
 export default function Dashboard() {
   const { profile, user } = useAuth()
+  const canCreateRoom = profile?.role === 'super_admin' || profile?.role === 'group_admin'
   const navigate = useNavigate()
   const [rooms, setRooms] = useState<RoomWithMeta[]>([])
   const [loading, setLoading] = useState(true)
@@ -111,12 +112,14 @@ export default function Dashboard() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h2 className="font-bebas text-lg text-app-text tracking-wider">Meine Gruppen</h2>
-            <button
-              onClick={() => navigate('/room/new')}
-              className="bg-primary font-bebas text-white text-xs px-3 py-1.5 rounded tracking-[2px] active:scale-95 transition-transform"
-            >
-              + Gruppe
-            </button>
+            {canCreateRoom && (
+              <button
+                onClick={() => navigate('/room/new')}
+                className="bg-primary font-bebas text-white text-xs px-3 py-1.5 rounded tracking-[2px] active:scale-95 transition-transform"
+              >
+                + Gruppe
+              </button>
+            )}
           </div>
 
           {loading && (
@@ -138,15 +141,19 @@ export default function Dashboard() {
               <div>
                 <p className="font-bebas text-lg text-app-text tracking-wider">Noch keine Gruppe</p>
                 <p className="font-inter text-app-muted text-xs mt-1">
-                  Erstelle eine Gruppe oder tritt einer per Einladungslink bei.
+                  {canCreateRoom
+                    ? 'Erstelle eine Gruppe oder tritt einer per Einladungslink bei.'
+                    : 'Tritt einer Gruppe per Einladungslink bei.'}
                 </p>
               </div>
-              <button
-                onClick={() => navigate('/room/new')}
-                className="bg-primary font-bebas text-white px-6 py-3 rounded-lg tracking-[2px] text-sm active:scale-95 transition-transform shadow-md shadow-primary/30"
-              >
-                Gruppe erstellen
-              </button>
+              {canCreateRoom && (
+                <button
+                  onClick={() => navigate('/room/new')}
+                  className="bg-primary font-bebas text-white px-6 py-3 rounded-lg tracking-[2px] text-sm active:scale-95 transition-transform shadow-md shadow-primary/30"
+                >
+                  Gruppe erstellen
+                </button>
+              )}
             </div>
           )}
 

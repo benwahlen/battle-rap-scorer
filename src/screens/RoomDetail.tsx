@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
+import { useAuth, useIsSuperAdmin, useIsGroupAdmin } from '../context/AuthContext'
 import type { Event, Room } from '../types'
 
 type EventStatus = 'unrated' | 'waiting' | 'reveal'
@@ -20,6 +20,8 @@ export default function RoomDetail() {
   const { roomId } = useParams<{ roomId: string }>()
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const isSuperAdmin = useIsSuperAdmin()
+  const isRoomAdmin = useIsGroupAdmin(roomId)
 
   const [room, setRoom] = useState<Room | null>(null)
   const [members, setMembers] = useState<Member[]>([])
@@ -53,10 +55,20 @@ export default function RoomDetail() {
         }))
       )
 
-      // Events for this room
-      const { data: eventsData, error: eventsErr } = await supabase
-        .from('events').select('*').eq('room_id', roomId).order('created_at', { ascending: false })
+      // Events for this room: via room_events (new) + direct room_id (legacy), deduplicated
+      const [{ data: roomEventsRows, error: eventsErr }, { data: legacyEvents }] = await Promise.all([
+        supabase.from('room_events').select('events(*)').eq('room_id', roomId),
+        supabase.from('events').select('*').eq('room_id', roomId),
+      ])
       if (eventsErr) throw eventsErr
+      const fromRoomEvents = (roomEventsRows ?? []).map((re: { events: unknown }) => re.events).filter(Boolean) as Event[]
+      const legacy = (legacyEvents ?? []) as Event[]
+      const seenIds = new Set<string>()
+      const eventsData: Event[] = [...fromRoomEvents, ...legacy].filter(e => {
+        if (seenIds.has(e.id)) return false
+        seenIds.add(e.id)
+        return true
+      }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
       const withStatus: EventWithStatus[] = await Promise.all(
         (eventsData ?? []).map(async (event: Event) => {
@@ -125,12 +137,22 @@ export default function RoomDetail() {
           <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">Gruppe</p>
           <h1 className="font-bebas text-xl text-app-text tracking-wider truncate leading-none">{room?.name ?? '…'}</h1>
         </div>
-        <button
-          onClick={() => navigate(`/room/${roomId}/new-event`)}
-          className="bg-primary font-bebas text-white text-xs px-3 py-1.5 rounded tracking-[2px] active:scale-95 transition-transform"
-        >
-          + Event
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => navigate(`/room/${roomId}/new-event`)}
+            className="bg-primary font-bebas text-white text-xs px-3 py-1.5 rounded tracking-[2px] active:scale-95 transition-transform"
+          >
+            + Event
+          </button>
+        )}
+        {!isSuperAdmin && isRoomAdmin && (
+          <button
+            onClick={() => navigate(`/event-pool/${roomId}`)}
+            className="bg-secondary font-bebas text-black text-xs px-3 py-1.5 rounded tracking-[2px] active:scale-95 transition-transform"
+          >
+            Events hinzufügen
+          </button>
+        )}
       </div>
 
       <div className="p-4 flex flex-col gap-5">
@@ -178,7 +200,9 @@ export default function RoomDetail() {
           <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
             <div className="text-5xl">🎤</div>
             <p className="font-bebas text-lg text-app-text tracking-wider">Noch keine Events</p>
-            <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.1em]">Tippe „+ Event" um loszulegen</p>
+            <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.1em]">
+              {isSuperAdmin ? 'Tippe „+ Event" um loszulegen' : 'Noch keine Events in dieser Gruppe'}
+            </p>
           </div>
         )}
 

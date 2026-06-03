@@ -1,12 +1,14 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import type { UserRole } from '../types'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface Profile {
   id: string
   display_name: string
+  role: UserRole
 }
 
 interface AuthContextValue {
@@ -68,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name')
+        .select('id, display_name, role')
         .eq('id', authUser.id)
         .single()
 
@@ -87,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: created } = await supabase
         .from('profiles')
         .insert({ id: authUser.id, display_name: displayName })
-        .select('id, display_name')
+        .select('id, display_name, role')
         .single()
 
       if (created) setProfile(created as Profile)
@@ -129,6 +131,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   )
+}
+
+// ── Role hooks ───────────────────────────────────────────────────────────────
+
+export function useIsSuperAdmin() {
+  const { profile } = useAuth()
+  return profile?.role === 'super_admin'
+}
+
+export function useIsGroupAdmin(roomId: string | undefined) {
+  const { user } = useAuth()
+  const userId = user?.id
+  const [isRoomAdmin, setIsRoomAdmin] = useState(false)
+
+  useEffect(() => {
+    if (!roomId || !userId) { setIsRoomAdmin(false); return }
+    let cancelled = false
+    supabase
+      .from('room_members')
+      .select('role')
+      .eq('room_id', roomId)
+      .eq('user_id', userId)
+      .single()
+      .then(({ data }) => { if (!cancelled) setIsRoomAdmin(data?.role === 'admin') })
+    return () => { cancelled = true }
+  }, [roomId, userId])
+
+  return isRoomAdmin
 }
 
 // ── Error translation ─────────────────────────────────────────────────────────

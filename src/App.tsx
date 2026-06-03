@@ -11,6 +11,8 @@ import NewEvent from './screens/NewEvent'
 import BattleOverview from './screens/BattleOverview'
 import WaitScreen from './screens/WaitScreen'
 import Reveal from './screens/Reveal'
+import EventPool from './screens/EventPool'
+import Backoffice from './screens/Backoffice'
 
 function AppRoutes() {
   const { user, profile, loading } = useAuth()
@@ -68,6 +70,9 @@ function AppRoutes() {
       <Route path="/room/:roomId/reveal/:eventId" element={<Reveal />} />
       <Route path="/join/:inviteCode" element={<JoinRoom />} />
       <Route path="/profile" element={<ProfileScreen />} />
+      <Route path="/event-pool/:roomId" element={<EventPool />} />
+      <Route path="/backoffice" element={<Backoffice />} />
+      <Route path="/backoffice/new-event" element={<NewEvent />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

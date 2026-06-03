@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth, useIsSuperAdmin } from '../context/AuthContext'
 
 interface BattleInput {
   mc1: string
@@ -57,6 +58,15 @@ async function analyzeBattlecard(file: File): Promise<{
 export default function NewEvent() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
+  const { user, loading: authLoading } = useAuth()
+  const isSuperAdmin = useIsSuperAdmin()
+
+  useEffect(() => {
+    if (!authLoading && !isSuperAdmin) {
+      navigate(roomId ? `/room/${roomId}` : '/', { replace: true })
+    }
+  }, [authLoading, isSuperAdmin, navigate, roomId])
+
   const [name, setName] = useState('')
   const [date, setDate] = useState('')
   const [location, setLocation] = useState('')
@@ -141,6 +151,13 @@ export default function NewEvent() {
         }))
       )
       if (battlesError) throw battlesError
+
+      if (roomId) {
+        await supabase.from('room_events').upsert(
+          { room_id: roomId, event_id: event.id, added_by: user?.id ?? null },
+          { onConflict: 'room_id,event_id' }
+        )
+      }
 
       navigate(roomId ? `/room/${roomId}` : '/', { replace: true })
     } catch {

@@ -1,3 +1,6 @@
+export type UserRole = 'member' | 'group_admin' | 'super_admin'
+export type RoomMemberRole = 'member' | 'admin'
+
 export interface Room {
   id: string
   name: string
@@ -10,7 +13,16 @@ export interface RoomMember {
   id: string
   room_id: string
   user_id: string
+  role: RoomMemberRole
   joined_at: string
+}
+
+export interface RoomEvent {
+  id: string
+  room_id: string
+  event_id: string
+  added_by: string | null
+  added_at: string
 }
 
 export interface Event {

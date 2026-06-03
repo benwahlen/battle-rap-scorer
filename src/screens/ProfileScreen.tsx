@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
+import { useAuth, useIsSuperAdmin } from '../context/AuthContext'
 
 export default function ProfileScreen() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const isSuperAdmin = useIsSuperAdmin()
 
   const [editingName, setEditingName] = useState(false)
   const [newName, setNewName] = useState(profile?.display_name ?? '')
@@ -118,6 +119,16 @@ export default function ProfileScreen() {
           <label className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted">Email</label>
           <p className="font-inter text-app-text text-sm">{user?.email}</p>
         </div>
+
+        {/* Backoffice (only super_admin) */}
+        {isSuperAdmin && (
+          <button
+            onClick={() => navigate('/backoffice')}
+            className="w-full card rounded-lg py-4 font-bebas text-primary tracking-[2px] text-sm border-primary/20 active:scale-95 transition-transform"
+          >
+            ⚙ Backoffice
+          </button>
+        )}
 
         {/* Logout */}
         <button
