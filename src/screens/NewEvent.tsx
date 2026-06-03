@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth, useIsSuperAdmin } from '../context/AuthContext'
 
@@ -58,8 +58,6 @@ async function analyzeBattlecard(file: File): Promise<{
 export default function NewEvent() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
-  const currentPath = useLocation().pathname
-  const isFromBackoffice = currentPath.startsWith('/backoffice')
   const { user, profile, loading: authLoading } = useAuth()
   const isSuperAdmin = useIsSuperAdmin()
   const showPublishing = isSuperAdmin && !roomId
@@ -83,6 +81,16 @@ export default function NewEvent() {
   const [publishRooms, setPublishRooms] = useState<{ id: string; name: string }[]>([])
   const [publishError, setPublishError] = useState<string | null>(null)
 
+  interface DebugState {
+    profileRole: string | undefined
+    showPublishingFlag: boolean
+    publishRoomsLoaded: number
+    targetIds: string[]
+    upsertResult: string
+  }
+  const [debugInfo, setDebugInfo] = useState<DebugState | null>(null)
+  const [successInfo, setSuccessInfo] = useState<{ eventName: string; publishedToCount: number } | null>(null)
+
   useEffect(() => {
     if (!showPublishing) return
     supabase.from('rooms').select('id, name').order('name')
@@ -104,6 +112,14 @@ export default function NewEvent() {
       else next.add(rid)
       return next
     })
+  }
+
+  const resetForm = () => {
+    setName(''); setDate(''); setLocation('')
+    setBattles([{ mc1: '', mc2: '', format: '1v1' }])
+    setError(null); setPublishError(null); setDebugInfo(null); setSuccessInfo(null)
+    setPublishAll(true); setSelectedRoomIds(new Set())
+    setImagePreview(null); setScanStatus('idle'); setScanError(null)
   }
 
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -166,6 +182,8 @@ export default function NewEvent() {
     setSaving(true)
     setError(null)
     setPublishError(null)
+    setDebugInfo(null)
+    setSuccessInfo(null)
     try {
       const { data: event, error: eventError } = await supabase
         .from('events')
@@ -186,34 +204,48 @@ export default function NewEvent() {
       if (battlesError) throw battlesError
 
       if (showPublishing) {
+        // ── Publishing flow: stay on page, show debug + success ─────────────
         const targetIds = publishAll ? publishRooms.map(r => r.id) : [...selectedRoomIds]
-        console.log('[NewEvent] Publishing attempt: publishAll=', publishAll, 'publishRooms=', publishRooms.length, 'targetIds=', targetIds)
+        let upsertResult = 'kein Upsert (targetIds leer)'
+        let publishedToCount = 0
+
         if (targetIds.length > 0) {
-          const { error: reErr } = await supabase.from('room_events').upsert(
+          const { data: reData, error: reErr } = await supabase.from('room_events').upsert(
             targetIds.map(rid => ({ room_id: rid, event_id: event.id, added_by: user?.id ?? null })),
             { onConflict: 'room_id,event_id' }
           )
+          upsertResult = JSON.stringify({
+            data: reData,
+            error: reErr ? { code: reErr.code, message: reErr.message, hint: reErr.hint, details: reErr.details } : null,
+          }, null, 2)
           if (reErr) {
-            console.error('[NewEvent] room_events upsert failed:', reErr.code, reErr.message, reErr.details, reErr.hint)
-            setPublishError(`Publish fehlgeschlagen (${reErr.code}): ${reErr.message}${reErr.hint ? ' — ' + reErr.hint : ''}`)
+            setPublishError(`Publish fehlgeschlagen (${reErr.code}): ${reErr.message}`)
           } else {
-            console.log('[NewEvent] room_events upsert OK for', targetIds.length, 'rooms')
+            publishedToCount = targetIds.length
           }
-        } else {
-          console.warn('[NewEvent] targetIds empty — publishRooms:', publishRooms, 'selectedRoomIds:', [...selectedRoomIds])
-          setPublishError('Keine Gruppen ausgewählt / geladen. Supabase-Konsole prüfen.')
         }
+
+        setDebugInfo({
+          profileRole: profile?.role,
+          showPublishingFlag: showPublishing,
+          publishRoomsLoaded: publishRooms.length,
+          targetIds,
+          upsertResult,
+        })
+        setSuccessInfo({ eventName: event.name, publishedToCount })
+        setSaving(false)
+
       } else if (roomId) {
+        // ── Room-based flow: navigate back ───────────────────────────────────
         const { error: reErr } = await supabase.from('room_events').upsert(
           { room_id: roomId, event_id: event.id, added_by: user?.id ?? null },
           { onConflict: 'room_id,event_id' }
         )
-        if (reErr) {
-          console.error('[NewEvent] room_events upsert (room) failed:', reErr.code, reErr.message, reErr.hint)
-        }
+        if (reErr) console.error('[NewEvent] room_events upsert failed:', reErr.code, reErr.message)
+        navigate(`/room/${roomId}`, { replace: true })
+      } else {
+        navigate('/', { replace: true })
       }
-
-      navigate(roomId ? `/room/${roomId}` : isFromBackoffice ? '/backoffice' : '/', { replace: true })
     } catch {
       setError('Fehler beim Speichern. Bitte erneut versuchen.')
       setSaving(false)
@@ -229,7 +261,61 @@ export default function NewEvent() {
         <h1 className="font-bebas text-xl text-app-text tracking-wider">Neues Event</h1>
       </div>
 
-      <div className="p-4 flex flex-col gap-6 pb-32">
+      {/* ── Success Screen ──────────────────────────────────────────────────── */}
+      {successInfo && (
+        <div className="p-4 flex flex-col gap-5 pt-10">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center text-3xl">✓</div>
+            <div>
+              <p className="font-bebas text-2xl text-secondary tracking-wider">Event erfolgreich angelegt</p>
+              <p className="font-bebas text-lg text-app-text tracking-wider mt-0.5">{successInfo.eventName}</p>
+              {showPublishing && (
+                <p className="font-inter text-app-muted text-sm mt-1">
+                  In {successInfo.publishedToCount} {successInfo.publishedToCount === 1 ? 'Gruppe' : 'Gruppen'} publiziert
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* ── Debug Block (immer sichtbar nach Submit) ── */}
+          {debugInfo && (
+            <div className="card border-red-700/50 rounded-lg p-4 bg-red-950/10 flex flex-col gap-1.5">
+              <p className="font-bebas text-red-400 tracking-wider text-sm mb-1">DEBUG</p>
+              <p className="font-mono text-[10px] text-red-300"><span className="text-red-500">profile.role:</span> {debugInfo.profileRole ?? 'null'}</p>
+              <p className="font-mono text-[10px] text-red-300"><span className="text-red-500">showPublishing:</span> {String(debugInfo.showPublishingFlag)}</p>
+              <p className="font-mono text-[10px] text-red-300"><span className="text-red-500">publishRooms geladen:</span> {debugInfo.publishRoomsLoaded}</p>
+              <p className="font-mono text-[10px] text-red-300"><span className="text-red-500">targetIds ({debugInfo.targetIds.length}):</span> {debugInfo.targetIds.join(', ') || '— leer —'}</p>
+              <p className="font-mono text-[10px] text-red-500 mt-1">upsert result:</p>
+              <pre className="font-mono text-[9px] text-red-300 whitespace-pre-wrap break-all bg-black/30 rounded p-2">{debugInfo.upsertResult}</pre>
+            </div>
+          )}
+
+          {publishError && (
+            <div className="card border-red-800/50 rounded-lg p-3">
+              <p className="text-red-400 font-inter text-sm font-semibold">Publishing-Fehler:</p>
+              <p className="text-red-300 font-inter text-sm break-all mt-1">{publishError}</p>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 mt-2">
+            <button
+              onClick={() => navigate('/backoffice')}
+              className="w-full bg-primary font-bebas text-white py-4 rounded-lg tracking-[2px] text-base active:scale-95 transition-transform shadow-lg shadow-primary/30"
+            >
+              Zum Backoffice
+            </button>
+            <button
+              onClick={resetForm}
+              className="w-full card font-bebas text-app-text py-4 rounded-lg tracking-[2px] text-base active:scale-95 transition-transform"
+            >
+              Weiteres Event anlegen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Form ─────────────────────────────────────────────────────────────── */}
+      {!successInfo && <div className="p-4 flex flex-col gap-6 pb-32">
 
         {/* Battlecard Scanner */}
         <div className="flex flex-col gap-3">
@@ -360,14 +446,16 @@ export default function NewEvent() {
         )}
 
         {error && <div className="card border-red-800/50 rounded-lg p-3 text-red-400 font-inter text-sm">{error}</div>}
-      </div>
+      </div>}
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-app-bg/90 backdrop-blur border-t border-white/5">
-        <button onClick={handleSubmit} disabled={saving || scanning}
-          className="w-full bg-primary font-bebas text-app-text py-4 rounded-lg tracking-[2px] text-base disabled:opacity-50 active:scale-95 transition-transform shadow-lg shadow-primary/30">
-          {saving ? 'Speichern…' : 'Event erstellen'}
-        </button>
-      </div>
+      {!successInfo && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-app-bg/90 backdrop-blur border-t border-white/5">
+          <button onClick={handleSubmit} disabled={saving || scanning}
+            className="w-full bg-primary font-bebas text-app-text py-4 rounded-lg tracking-[2px] text-base disabled:opacity-50 active:scale-95 transition-transform shadow-lg shadow-primary/30">
+            {saving ? 'Speichern…' : 'Event erstellen'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
