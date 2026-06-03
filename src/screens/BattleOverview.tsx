@@ -372,7 +372,7 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
                       </div>
                       {/* Stepper row: MC1-name | stepper | divider | stepper | MC2-name */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1px auto 1fr', gap: '0 0.5rem' }}
-                        className="items-center">
+                        className="items-center overflow-hidden">
                         <span className="font-inter text-[9px] uppercase tracking-wider text-app-muted text-right truncate pr-1">
                           {battle.mc1}
                         </span>

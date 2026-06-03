@@ -122,7 +122,7 @@ export default function AuthScreen() {
                 <div className="text-4xl">📬</div>
                 <h2 className="font-bebas text-xl text-app-text tracking-wider">Fast geschafft!</h2>
                 <p className="font-inter text-app-muted text-sm">
-                  Wir haben dir eine Bestätigungsmail an <span className="text-app-text">{regEmail}</span> geschickt.
+                  Wir haben dir eine Bestätigungsmail an <span className="text-app-text break-all">{regEmail}</span> geschickt.
                   Bitte bestätige deine Email und logge dich dann ein.
                 </p>
                 <button

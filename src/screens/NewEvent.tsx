@@ -379,12 +379,12 @@ export default function NewEvent() {
                     className="text-app-muted text-base w-7 h-7 flex items-center justify-center">✕</button>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <input type="text" placeholder="MC 1" value={battle.mc1} onChange={e => updateBattle(i, 'mc1', e.target.value)}
-                  className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-2.5 text-app-text placeholder-app-muted/50 focus:outline-none focus:border-primary/50 font-inter text-sm" />
-                <span className="font-bebas text-app-muted tracking-wider">vs</span>
+                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded px-3 py-2.5 text-app-text placeholder-app-muted/50 focus:outline-none focus:border-primary/50 font-inter text-sm" />
+                <span className="font-bebas text-app-muted tracking-wider flex-shrink-0">vs</span>
                 <input type="text" placeholder="MC 2" value={battle.mc2} onChange={e => updateBattle(i, 'mc2', e.target.value)}
-                  className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-2.5 text-app-text placeholder-app-muted/50 focus:outline-none focus:border-primary/50 font-inter text-sm" />
+                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded px-3 py-2.5 text-app-text placeholder-app-muted/50 focus:outline-none focus:border-primary/50 font-inter text-sm" />
               </div>
               <div className="flex gap-2">
                 {(['1v1', '2v2'] as const).map(fmt => (

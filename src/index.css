@@ -7,6 +7,12 @@ body {
   font-family: 'Inter', sans-serif;
   background-color: #0A0A0F;
   color: #F1F0FF;
+  overflow-x: hidden;
+}
+
+#root {
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* Graffiti photo — only 15% visible */

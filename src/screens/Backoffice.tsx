@@ -20,6 +20,7 @@ interface EventRow {
   location: string | null
   created_at: string
   roomCount: number
+  roomNames: string[]
 }
 
 interface RoomRow {
@@ -147,7 +148,7 @@ function UsersTab() {
           <select
             value={user.role}
             onChange={e => handleRoleChange(user.id, e.target.value as UserRole)}
-            className="bg-white/5 border border-white/10 rounded px-2 py-1.5 text-app-text font-inter text-xs focus:outline-none focus:border-primary/50"
+            className="bg-white/5 border border-white/10 rounded px-2 py-1.5 text-app-text font-inter text-xs focus:outline-none focus:border-primary/50 flex-shrink-0 max-w-[130px]"
           >
             {(Object.entries(roleLabel) as [UserRole, string][]).map(([val, label]) => (
               <option key={val} value={val}>{label}</option>
@@ -178,27 +179,29 @@ function EventsTab() {
     setError(null)
     const [{ data: evData, error: evErr }, { data: reData, error: reErr }] = await Promise.all([
       supabase.from('events').select('id, name, date, location, room_id, created_at').order('created_at', { ascending: false }),
-      supabase.from('room_events').select('event_id, room_id'),
+      supabase.from('room_events').select('event_id, room_id, rooms(name)'),
     ])
     if (evErr) { setError('Fehler beim Laden.'); setLoading(false); return }
     if (reErr) console.error('[Backoffice EventsTab] room_events query error:', reErr.code, reErr.message, reErr.hint)
 
-    console.log('[Backoffice EventsTab] events:', evData?.length, 'room_events:', reData?.length, reData?.slice(0, 3))
-
-    // Count rooms per event: from room_events (new) + legacy room_id (old), deduplicated
-    type RERow = { event_id: string; room_id: string }
-    const reByEvent: Record<string, string[]> = {}
-    for (const re of (reData ?? []) as RERow[]) {
+    type RERow = { event_id: string; room_id: string; rooms: { name: string } | { name: string }[] | null }
+    const reByEvent: Record<string, { id: string; name: string }[]> = {}
+    for (const re of (reData ?? []) as unknown as RERow[]) {
       if (!reByEvent[re.event_id]) reByEvent[re.event_id] = []
-      reByEvent[re.event_id].push(re.room_id)
+      const roomsRaw = re.rooms
+      const roomName = roomsRaw
+        ? Array.isArray(roomsRaw) ? (roomsRaw[0]?.name ?? '?') : roomsRaw.name
+        : '?'
+      reByEvent[re.event_id].push({ id: re.room_id, name: roomName })
     }
 
     setEvents(
       (evData ?? []).map((e: { id: string; name: string; date: string | null; location: string | null; room_id: string | null; created_at: string }) => {
-        const roomIds = new Set<string>(reByEvent[e.id] ?? [])
-        if (e.room_id) roomIds.add(e.room_id)
-        console.log(`[Backoffice] "${e.name}": room_events=${reByEvent[e.id]?.length ?? 0}, room_id=${e.room_id}, total=${roomIds.size}`)
-        return { id: e.id, name: e.name, date: e.date, location: e.location, created_at: e.created_at, roomCount: roomIds.size }
+        const roomEntries = reByEvent[e.id] ?? []
+        const roomIdSet = new Set(roomEntries.map(r => r.id))
+        const roomNames = roomEntries.map(r => r.name)
+        if (e.room_id && !roomIdSet.has(e.room_id)) { roomIdSet.add(e.room_id); roomNames.push('(Legacy)') }
+        return { id: e.id, name: e.name, date: e.date, location: e.location, created_at: e.created_at, roomCount: roomIdSet.size, roomNames }
       })
     )
     setLoading(false)
@@ -242,8 +245,13 @@ function EventsTab() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
-              <span className="font-inter text-[10px] text-app-muted/60 uppercase tracking-[0.1em]">
+              <span className="font-inter text-[10px] text-app-muted/60 tracking-[0.05em] text-right">
                 {event.roomCount} {event.roomCount === 1 ? 'Gruppe' : 'Gruppen'}
+                {event.roomNames.length > 0 && (
+                  <span className="block text-app-muted/40 normal-case tracking-normal">
+                    {event.roomNames.join(', ')}
+                  </span>
+                )}
               </span>
               <span className="text-app-muted text-xs">{expandedId === event.id ? '▲' : '▾'}</span>
             </div>
