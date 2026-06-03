@@ -29,16 +29,23 @@ export default function Dashboard() {
         .from('room_members')
         .select('room_id')
         .eq('user_id', user!.id)
-      if (mErr) throw mErr
+      if (mErr) { console.error('[Dashboard] room_members query:', mErr.code, mErr.message, mErr.details); throw mErr }
 
       const roomIds = (memberships ?? []).map((m: { room_id: string }) => m.room_id)
       if (roomIds.length === 0) { setRooms([]); setLoading(false); return }
 
-      const [{ data: roomsData }, { data: allMembers }, { data: allEvents }] = await Promise.all([
+      const [
+        { data: roomsData, error: roomsErr },
+        { data: allMembers, error: membersErr },
+        { data: allEvents, error: eventsErr },
+      ] = await Promise.all([
         supabase.from('rooms').select('*').in('id', roomIds),
         supabase.from('room_members').select('room_id').in('room_id', roomIds),
         supabase.from('events').select('id, room_id').in('room_id', roomIds),
       ])
+      if (roomsErr) console.error('[Dashboard] rooms query:', roomsErr.code, roomsErr.message)
+      if (membersErr) console.error('[Dashboard] allMembers query:', membersErr.code, membersErr.message)
+      if (eventsErr) console.error('[Dashboard] events query:', eventsErr.code, eventsErr.message)
 
       // Build open event count: events where this user has no battle_verdicts at all
       const eventIds = (allEvents ?? []).map((e: { id: string }) => e.id)
@@ -71,7 +78,8 @@ export default function Dashboard() {
       })
 
       setRooms(withMeta)
-    } catch {
+    } catch (e) {
+      console.error('[Dashboard] loadRooms caught:', e)
       setError('Fehler beim Laden. Bitte Internetverbindung prüfen.')
     } finally {
       setLoading(false)

@@ -23,16 +23,17 @@ export default function CreateRoom() {
         .insert({ name: name.trim(), created_by: user!.id })
         .select()
         .single()
-      if (roomErr) throw roomErr
+      if (roomErr) { console.error('[CreateRoom] rooms insert:', roomErr.code, roomErr.message, roomErr.details); throw roomErr }
 
       // Add creator as member
       const { error: memberErr } = await supabase
         .from('room_members')
         .insert({ room_id: room.id, user_id: user!.id })
-      if (memberErr) throw memberErr
+      if (memberErr) { console.error('[CreateRoom] room_members insert:', memberErr.code, memberErr.message, memberErr.details); throw memberErr }
 
       navigate(`/room/${room.id}`, { replace: true })
-    } catch {
+    } catch (e) {
+      console.error('[CreateRoom] caught:', e)
       setError('Fehler beim Erstellen. Bitte erneut versuchen.')
       setSaving(false)
     }
