@@ -385,7 +385,7 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
                     <div key={cat.key} className={`rounded-lg p-2 ${isDoubled ? 'double-down-active' : ''}`}>
                       {/* Label + 2x Button */}
                       <div className="flex items-center justify-center gap-2 mb-2">
-                        <span className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted">{cat.label}</span>
+                        <span className="font-inter font-bold uppercase" style={{ color: '#C0B8E8', fontSize: '11px', letterSpacing: '0.12em' }}>{cat.label}</span>
                         <button onClick={() => toggleDoubleDown(round, cat.key)}
                           className={`font-bebas text-xs px-2 py-0.5 rounded tracking-wider transition-colors ${
                             isDoubled ? 'bg-primary text-white shadow-sm shadow-primary/50' : 'bg-white/10 text-app-muted'
@@ -399,7 +399,7 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
                           mc={battle.mc1}
                           value={rs[mc1Key] as number}
                           onChange={v => setScoreVal(round, mc1Key, v)}
-                          isLeading={(rs[mc1Key] as number) >= (rs[mc2Key] as number)}
+                          isLeading={(rs[mc1Key] as number) > (rs[mc2Key] as number)}
                         />
                         <Slider
                           mc={battle.mc2}

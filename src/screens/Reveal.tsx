@@ -15,9 +15,10 @@ interface BattleReveal {
 const winnerLabel = (w: string | null, mc1: string, mc2: string) =>
   w === 'mc1' ? mc1 : w === 'mc2' ? mc2 : w === 'draw' ? 'Draw' : '–'
 
-// Color for each user slot: first = primary, second = secondary, rest = accent
-const USER_COLORS = ['text-primary', 'text-secondary', 'text-accent']
-const USER_BG_COLORS = ['bg-primary/20', 'bg-secondary/20', 'bg-accent/20']
+const CAT_LABEL_STYLE: React.CSSProperties = {
+  color: '#C0B8E8', fontSize: '10px', fontWeight: 700,
+  letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'Inter, sans-serif',
+}
 
 export default function Reveal() {
   const { roomId, eventId } = useParams<{ roomId: string; eventId: string }>()
@@ -51,14 +52,8 @@ export default function Reveal() {
         setReveals((battles ?? []).map((battle: Battle) => {
           const bScores: Score[] = (allScores ?? []).filter((s: Score) => s.battle_id === battle.id)
           const bVerdicts: BattleVerdict[] = (allVerdicts ?? []).filter((v: BattleVerdict) => v.battle_id === battle.id)
-
-          // Collect unique user names — put current user first
           const allNames = [...new Set(bVerdicts.map((v: BattleVerdict) => v.user_name))]
-          const userNames = [
-            displayName,
-            ...allNames.filter(n => n !== displayName),
-          ].filter(n => allNames.includes(n))
-
+          const userNames = [displayName, ...allNames.filter(n => n !== displayName)].filter(n => allNames.includes(n))
           const scores: Record<string, Score[]> = {}
           const verdicts: Record<string, BattleVerdict> = {}
           for (const name of userNames) {
@@ -68,7 +63,7 @@ export default function Reveal() {
           }
           return { battle, userNames, scores, verdicts }
         }))
-      } catch { /* stille Fehlerbehandlung */ }
+      } catch { /* silent */ }
       finally { setLoading(false) }
     }
     load()
@@ -83,220 +78,214 @@ export default function Reveal() {
   return (
     <div className="min-h-screen">
       <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 flex items-center gap-3 z-10 noise-header">
-        <button onClick={() => navigate(roomId ? `/room/${roomId}` : '/')} className="text-app-muted text-xl w-8">←</button>
-        <div>
+        <button onClick={() => navigate(roomId ? `/room/${roomId}` : '/')} className="text-app-muted text-xl w-8 flex-shrink-0">←</button>
+        <div className="flex-1 min-w-0">
           <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">Reveal</p>
-          <h1 className="font-bebas text-xl text-app-text tracking-wider">{eventName}</h1>
+          <h1 className="font-bebas text-xl text-app-text tracking-wider truncate">{eventName}</h1>
         </div>
       </div>
 
       <div className="p-4 flex flex-col gap-8 pb-10">
-        {reveals.map(({ battle, userNames, scores, verdicts }) => (
-          <div key={battle.id} className="flex flex-col gap-3">
-            {/* Battle header */}
-            <div className="text-center py-2">
-              <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">{battle.format}</p>
-              <h2 className="font-bebas text-2xl text-primary tracking-wider">{battle.mc1} vs {battle.mc2}</h2>
-            </div>
+        {reveals.map(({ battle, userNames, scores, verdicts }) => {
+          const user0 = userNames[0] ?? ''
+          const user1 = userNames[1] ?? ''
 
-            {/* User legend */}
-            <div className="flex gap-2 justify-center">
-              {userNames.map((name, idx) => (
-                <span key={name} className={`font-inter text-[10px] px-2.5 py-1 rounded uppercase tracking-[0.1em] font-bold ${USER_BG_COLORS[idx] ?? 'bg-white/10'} ${USER_COLORS[idx] ?? 'text-app-muted'}`}>
-                  {name}
-                </span>
-              ))}
-            </div>
+          return (
+            <div key={battle.id} className="flex flex-col gap-3">
 
-            {[1, 2, 3].map(round => {
-              const roundScores = userNames.map(name => scores[name]?.[round - 1])
-              if (roundScores.every(s => !s)) return null
-              const roundWinners = userNames.map(name => scores[name]?.[round - 1]?.round_winner ?? null)
-              const allAgree = roundWinners.every(w => w === roundWinners[0])
-              const roundKey = `${battle.id}_${round}`
-              const isExpanded = expandedRounds.has(roundKey)
+              {/* ── Battle Header ──────────────────────────────────────────── */}
+              <div className="flex flex-col items-center gap-2 py-1">
+                <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">{battle.format}</p>
+                <h2 className="font-bebas text-2xl text-app-text tracking-wider text-center leading-tight">
+                  {battle.mc1} vs {battle.mc2}
+                </h2>
+                <div className="flex gap-2">
+                  {userNames.map((name, idx) => (
+                    <span key={name} className={`font-inter text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-[0.08em] ${
+                      idx === 0 ? 'bg-primary/20 text-primary' : 'bg-secondary/20 text-secondary'
+                    }`}>
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
 
-              // Compute averages for collapsed summary
-              const allRoundScores = userNames.map(n => scores[n]?.[round - 1]).filter(Boolean) as Score[]
-              const mc1Avg = allRoundScores.length === 0 ? 0 :
-                CATEGORIES.reduce((sum, cat) => sum + allRoundScores.reduce((s, rs) => s + ((rs[`${cat.key}_mc1` as keyof Score] as number) || 0), 0), 0) /
-                (allRoundScores.length * CATEGORIES.length)
-              const mc2Avg = allRoundScores.length === 0 ? 0 :
-                CATEGORIES.reduce((sum, cat) => sum + allRoundScores.reduce((s, rs) => s + ((rs[`${cat.key}_mc2` as keyof Score] as number) || 0), 0), 0) /
-                (allRoundScores.length * CATEGORIES.length)
+              {/* ── Rounds ────────────────────────────────────────────────── */}
+              {[1, 2, 3].map(round => {
+                const roundScores = userNames.map(name => scores[name]?.[round - 1])
+                if (roundScores.every(s => !s)) return null
+                const roundWinners = userNames.map(name => scores[name]?.[round - 1]?.round_winner ?? null)
+                const allAgree = roundWinners.length >= 2 && roundWinners[0] !== null && roundWinners.every(w => w === roundWinners[0])
+                const roundKey = `${battle.id}_${round}`
+                const isExpanded = expandedRounds.has(roundKey)
 
-              return (
-                <div key={round} className="card rounded-lg overflow-hidden">
-                  <button onClick={() => toggleRound(roundKey)}
-                    className="w-full px-4 py-3 text-left active:bg-white/5 transition-colors flex flex-col gap-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bebas text-primary tracking-widest text-base">Runde {round}</span>
-                      <span className="text-app-muted text-xs">{isExpanded ? '▲' : '▾'}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                        {userNames.map((name, idx) => (
-                          <span key={name} className="font-inter text-[10px]">
-                            <span className={USER_COLORS[idx] ?? 'text-app-muted'}>{name}</span>
-                            <span className="text-app-muted/60"> → </span>
-                            <span className="text-app-text font-bold">{winnerLabel(roundWinners[idx], battle.mc1, battle.mc2)}</span>
-                          </span>
-                        ))}
-                      </div>
-                      <span className={`font-inter text-[10px] font-bold flex-shrink-0 ${allAgree ? 'text-secondary' : 'text-accent'}`}>
-                        {allAgree ? 'Einig ✓' : '⚡'}
-                      </span>
-                    </div>
-                    <p className="font-inter text-[10px] text-app-muted/60">
-                      Ø {battle.mc1}: {mc1Avg.toFixed(1)} · Ø {battle.mc2}: {mc2Avg.toFixed(1)}
-                    </p>
-                  </button>
+                const allRoundScores = userNames.map(n => scores[n]?.[round - 1]).filter(Boolean) as Score[]
+                const mc1Avg = allRoundScores.length === 0 ? 0 :
+                  CATEGORIES.reduce((sum, cat) => sum + allRoundScores.reduce((s, rs) => s + ((rs[`${cat.key}_mc1` as keyof Score] as number) || 0), 0), 0) /
+                  (allRoundScores.length * CATEGORIES.length)
+                const mc2Avg = allRoundScores.length === 0 ? 0 :
+                  CATEGORIES.reduce((sum, cat) => sum + allRoundScores.reduce((s, rs) => s + ((rs[`${cat.key}_mc2` as keyof Score] as number) || 0), 0), 0) /
+                  (allRoundScores.length * CATEGORIES.length)
 
-                  {isExpanded && (
-                    <div className="border-t border-white/5">
-                      <div className="px-4 py-3 flex flex-col gap-3">
-                        {CATEGORIES.map(cat => {
-                          return (
-                            <div key={cat.key}>
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted">{cat.label}</p>
-                                {userNames.some(n => scores[n]?.[round - 1]?.double_down_category === cat.key) && (
-                                  <span className="font-bebas text-[10px] text-primary bg-primary/10 px-1.5 rounded tracking-wider">2×</span>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                {/* MC1 */}
-                                <div className="bg-white/5 rounded px-3 py-2">
-                                  <p className="font-inter text-[9px] text-app-muted mb-1 truncate">{battle.mc1}</p>
-                                  <div className="flex items-baseline gap-2 flex-wrap">
-                                    {userNames.map((name, idx) => {
-                                      const s = scores[name]?.[round - 1]
-                                      if (!s) return null
-                                      const myVal = s[`${cat.key}_mc1` as keyof Score] as number
-                                      const otherVals = userNames
-                                        .filter(n => n !== name)
-                                        .map(n => scores[n]?.[round - 1]?.[`${cat.key}_mc1` as keyof Score] as number ?? 0)
-                                      const isLeading = otherVals.every(v => myVal >= v)
-                                      return (
-                                        <span key={name}>
-                                          <span className="font-inter text-[10px] text-app-muted">{name} </span>
-                                          <span className={`font-bebas text-[22px] leading-none ${isLeading ? USER_COLORS[idx] ?? 'text-app-text' : 'text-[#444]'}`}>{myVal}</span>
-                                        </span>
-                                      )
-                                    })}
-                                  </div>
-                                </div>
-                                {/* MC2 */}
-                                <div className="bg-white/5 rounded px-3 py-2">
-                                  <p className="font-inter text-[9px] text-app-muted mb-1 truncate">{battle.mc2}</p>
-                                  <div className="flex items-baseline gap-2 flex-wrap">
-                                    {userNames.map((name, idx) => {
-                                      const s = scores[name]?.[round - 1]
-                                      if (!s) return null
-                                      const myVal = s[`${cat.key}_mc2` as keyof Score] as number
-                                      const otherVals = userNames
-                                        .filter(n => n !== name)
-                                        .map(n => scores[n]?.[round - 1]?.[`${cat.key}_mc2` as keyof Score] as number ?? 0)
-                                      const isLeading = otherVals.every(v => myVal >= v)
-                                      return (
-                                        <span key={name}>
-                                          <span className="font-inter text-[10px] text-app-muted">{name} </span>
-                                          <span className={`font-bebas text-[22px] leading-none ${isLeading ? USER_COLORS[idx] ?? 'text-app-text' : 'text-[#444]'}`}>{myVal}</span>
-                                        </span>
-                                      )
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-
-                      {/* Round winners detail */}
-                      <div className={`px-4 py-3 border-t border-white/5 ${allAgree ? 'bg-secondary/10' : 'bg-accent/10'}`}>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex gap-3 flex-wrap">
+                return (
+                  <div key={round} className="card rounded-lg overflow-hidden">
+                    {/* Collapsed header */}
+                    <button onClick={() => toggleRound(roundKey)}
+                      className="w-full px-4 pt-3 pb-2.5 text-left active:bg-white/5 transition-colors">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bebas text-primary tracking-widest text-base leading-tight mb-1.5">Runde {round}</p>
+                          <div className="flex flex-col gap-0.5">
                             {userNames.map((name, idx) => (
-                              <div key={name}>
-                                <p className={`font-inter text-[9px] uppercase mb-0.5 ${USER_COLORS[idx] ?? 'text-app-muted'}`}>{name}</p>
-                                <p className="font-bebas text-base text-app-text tracking-wider">
-                                  {winnerLabel(roundWinners[idx], battle.mc1, battle.mc2)}
-                                </p>
-                              </div>
+                              <p key={name} className="font-inter text-[11px] leading-snug">
+                                <span className={`font-bold ${idx === 0 ? 'text-primary' : 'text-secondary'}`}>{name}</span>
+                                <span className="text-app-muted/50"> → </span>
+                                <span className="text-app-text">{winnerLabel(roundWinners[idx], battle.mc1, battle.mc2)}</span>
+                              </p>
                             ))}
                           </div>
-                          <span className={`font-inter text-[10px] font-bold uppercase tracking-[0.1em] flex-shrink-0 ${allAgree ? 'text-secondary' : 'text-accent'}`}>
-                            {allAgree ? 'Einig ✓' : 'Diskussion!'}
+                          <p className="font-inter text-[10px] text-app-muted/50 mt-1.5">
+                            Ø {battle.mc1}: {mc1Avg.toFixed(1)} · {battle.mc2}: {mc2Avg.toFixed(1)}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0 pt-0.5">
+                          <span className={`font-inter text-[10px] font-bold px-2.5 py-0.5 rounded uppercase tracking-[0.08em] ${
+                            allAgree ? 'bg-secondary/15 text-secondary' : 'bg-accent/15 text-accent'
+                          }`}>
+                            {allAgree ? 'Einig ✓' : 'Diskussion'}
                           </span>
+                          <span className="text-app-muted/60 text-xs">{isExpanded ? '▲' : '▾'}</span>
                         </div>
                       </div>
+                    </button>
 
-                      {/* Round comments */}
-                      {userNames.some(name => scores[name]?.[round - 1]?.round_comment) && (
-                        <div className="px-4 pb-3 pt-3 border-t border-white/5 flex flex-col gap-2">
-                          {userNames.map((name, idx) => {
-                            const comment = scores[name]?.[round - 1]?.round_comment
-                            if (!comment) return null
+                    {/* Expanded: categories */}
+                    {isExpanded && (() => {
+                      const s0 = scores[user0]?.[round - 1]
+                      const s1 = scores[user1]?.[round - 1]
+                      return (
+                        <div className="border-t border-white/5 px-4 pt-3 pb-3 flex flex-col gap-3">
+                          {CATEGORIES.map(cat => {
+                            const mc1Key = `${cat.key}_mc1` as keyof Score
+                            const mc2Key = `${cat.key}_mc2` as keyof Score
+                            const v0mc1 = s0 ? (s0[mc1Key] as number) : 0
+                            const v1mc1 = s1 ? (s1[mc1Key] as number) : 0
+                            const v0mc2 = s0 ? (s0[mc2Key] as number) : 0
+                            const v1mc2 = s1 ? (s1[mc2Key] as number) : 0
+                            const isDoubled = userNames.some(n => scores[n]?.[round - 1]?.double_down_category === cat.key)
+
                             return (
-                              <div key={name} className="bg-white/5 rounded px-3 py-2">
-                                <p className={`font-inter text-[9px] uppercase font-bold mb-0.5 ${USER_COLORS[idx] ?? 'text-app-muted'}`}>{name}</p>
-                                <p className="font-inter text-app-muted text-sm">{comment}</p>
+                              <div key={cat.key}>
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <p style={CAT_LABEL_STYLE}>{cat.label}</p>
+                                  {isDoubled && (
+                                    <span className="font-bebas text-[10px] text-primary bg-primary/10 px-1.5 rounded tracking-wider">2×</span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {/* User0 (Ben) — Lila */}
+                                  <div className="bg-white/5 rounded-lg px-3 py-2">
+                                    <p className="font-inter text-[9px] text-primary font-bold uppercase tracking-[0.05em] mb-2">{user0}</p>
+                                    <div className="flex justify-around">
+                                      <div className="text-center">
+                                        <p className="font-inter text-[8px] text-app-muted/50 mb-0.5 truncate max-w-[52px]">{battle.mc1}</p>
+                                        <span className={`font-bebas text-[18px] leading-none ${
+                                          v0mc1 > v1mc1 ? 'text-primary' : v0mc1 === v1mc1 ? 'text-[#6B6B8A]' : 'text-[#3A3A4A]'
+                                        }`}>{v0mc1 || '–'}</span>
+                                      </div>
+                                      <span className="text-app-muted/20 text-sm self-end mb-0.5">·</span>
+                                      <div className="text-center">
+                                        <p className="font-inter text-[8px] text-app-muted/50 mb-0.5 truncate max-w-[52px]">{battle.mc2}</p>
+                                        <span className={`font-bebas text-[18px] leading-none ${
+                                          v0mc2 > v1mc2 ? 'text-primary' : v0mc2 === v1mc2 ? 'text-[#6B6B8A]' : 'text-[#3A3A4A]'
+                                        }`}>{v0mc2 || '–'}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {/* User1 (anderer) — Cyan */}
+                                  <div className="bg-white/5 rounded-lg px-3 py-2">
+                                    <p className="font-inter text-[9px] text-secondary font-bold uppercase tracking-[0.05em] mb-2">{user1 || '–'}</p>
+                                    <div className="flex justify-around">
+                                      <div className="text-center">
+                                        <p className="font-inter text-[8px] text-app-muted/50 mb-0.5 truncate max-w-[52px]">{battle.mc1}</p>
+                                        <span className={`font-bebas text-[18px] leading-none ${
+                                          v1mc1 > v0mc1 ? 'text-secondary' : v1mc1 === v0mc1 ? 'text-[#6B6B8A]' : 'text-[#3A3A4A]'
+                                        }`}>{v1mc1 || '–'}</span>
+                                      </div>
+                                      <span className="text-app-muted/20 text-sm self-end mb-0.5">·</span>
+                                      <div className="text-center">
+                                        <p className="font-inter text-[8px] text-app-muted/50 mb-0.5 truncate max-w-[52px]">{battle.mc2}</p>
+                                        <span className={`font-bebas text-[18px] leading-none ${
+                                          v1mc2 > v0mc2 ? 'text-secondary' : v1mc2 === v0mc2 ? 'text-[#6B6B8A]' : 'text-[#3A3A4A]'
+                                        }`}>{v1mc2 || '–'}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             )
                           })}
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                      )
+                    })()}
+                  </div>
+                )
+              })}
 
-            {/* Overall verdict */}
-            {userNames.length >= 2 && userNames.every(n => verdicts[n]) && (() => {
-              const allWinners = userNames.map(n => verdicts[n].overall_winner)
-              const agree = allWinners.every(w => w === allWinners[0])
-              return (
-                <div className={`card rounded-lg p-4 ${agree ? 'border-secondary/30' : 'border-accent/30'}`}>
-                  <p className="font-inter text-[10px] uppercase tracking-[0.15em] text-app-muted text-center mb-3">Gesamtsieger</p>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex gap-4 flex-wrap">
+              {/* ── Gesamtsieger ───────────────────────────────────────────── */}
+              {userNames.length >= 2 && userNames.every(n => verdicts[n]) && (() => {
+                const allWinners = userNames.map(n => verdicts[n].overall_winner)
+                const agree = allWinners.every(w => w === allWinners[0])
+                return (
+                  <div className="flex flex-col gap-2 mt-1">
+                    <p className="font-inter text-[10px] uppercase tracking-[0.15em] text-app-muted text-center">Gesamtsieger</p>
+                    <div className="grid grid-cols-2 gap-2">
                       {userNames.map((name, idx) => (
-                        <div key={name}>
-                          <p className={`font-inter text-[9px] uppercase mb-0.5 ${USER_COLORS[idx] ?? 'text-app-muted'}`}>{name}</p>
-                          <p className="font-bebas text-lg text-app-text tracking-wider">
+                        <div key={name} className={`rounded-lg p-4 text-center ${
+                          idx === 0 ? 'bg-primary/10 border border-primary/25' : 'bg-secondary/10 border border-secondary/25'
+                        }`}>
+                          <p className={`font-inter text-[9px] uppercase font-bold tracking-[0.08em] mb-1 ${
+                            idx === 0 ? 'text-primary' : 'text-secondary'
+                          }`}>{name}</p>
+                          <p className={`font-bebas text-xl tracking-wider leading-tight ${
+                            idx === 0 ? 'text-primary' : 'text-secondary'
+                          }`}>
                             {winnerLabel(verdicts[name].overall_winner, battle.mc1, battle.mc2)}
                           </p>
                         </div>
                       ))}
                     </div>
-                    <span className={`font-inter text-xs font-bold uppercase tracking-[0.1em] flex-shrink-0 ${agree ? 'text-secondary' : 'text-accent'}`}>
-                      {agree ? 'Einig! ✓' : 'Diskussion!'}
-                    </span>
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Battle comments */}
-            {userNames.some(n => verdicts[n]?.battle_comment) && (
-              <div className="flex flex-col gap-2">
-                <p className="font-inter text-[10px] uppercase tracking-[0.15em] text-app-muted">Battle-Fazit</p>
-                {userNames.map((name, idx) => {
-                  const comment = verdicts[name]?.battle_comment
-                  if (!comment) return null
-                  return (
-                    <div key={name} className="card rounded-lg px-4 py-3">
-                      <p className={`font-inter text-[9px] uppercase font-bold mb-1 ${USER_COLORS[idx] ?? 'text-app-muted'}`}>{name}</p>
-                      <p className="font-inter text-app-muted text-sm">{comment}</p>
+                    <div className="text-center">
+                      <span className={`font-inter text-[10px] font-bold uppercase tracking-[0.1em] px-3 py-1 rounded ${
+                        agree ? 'bg-secondary/15 text-secondary' : 'bg-accent/15 text-accent'
+                      }`}>
+                        {agree ? 'Einig ✓' : 'Diskussion'}
+                      </span>
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        ))}
+                  </div>
+                )
+              })()}
+
+              {/* ── Battle-Fazit ───────────────────────────────────────────── */}
+              {userNames.some(n => verdicts[n]?.battle_comment) && (
+                <div className="flex flex-col gap-2">
+                  <p className="font-inter text-[10px] uppercase tracking-[0.15em] text-app-muted">Battle-Fazit</p>
+                  {userNames.map((name, idx) => {
+                    const comment = verdicts[name]?.battle_comment
+                    if (!comment) return null
+                    return (
+                      <div key={name} className="card rounded-lg px-4 py-3">
+                        <p className={`font-inter text-[9px] uppercase font-bold mb-1 ${idx === 0 ? 'text-primary' : 'text-secondary'}`}>{name}</p>
+                        <p className="font-inter text-app-muted text-sm">{comment}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+            </div>
+          )
+        })}
       </div>
     </div>
   )
