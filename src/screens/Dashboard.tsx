@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { Room } from '../types'
+import Avatar from '../components/Avatar'
 
 interface RoomWithMeta extends Room {
   memberCount: number
@@ -99,9 +100,9 @@ export default function Dashboard() {
         </div>
         <button
           onClick={() => navigate('/profile')}
-          className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center"
+          className="rounded-full active:scale-95 transition-transform"
         >
-          <span className="text-lg">{profile?.avatar_emoji ?? '🎤'}</span>
+          <Avatar name={profile?.display_name ?? ''} size={36} />
         </button>
       </div>
 

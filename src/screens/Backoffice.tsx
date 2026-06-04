@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth, useIsSuperAdmin } from '../context/AuthContext'
 import type { UserRole, Battle } from '../types'
+import Avatar from '../components/Avatar'
 
 type Tab = 'users' | 'events' | 'rooms'
 
@@ -136,9 +137,7 @@ function UsersTab() {
 
       {filtered.map(user => (
         <div key={user.id} className="card rounded-lg p-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-            <span className="font-bebas text-primary text-sm">{user.display_name.charAt(0).toUpperCase()}</span>
-          </div>
+          <Avatar name={user.display_name} size={36} />
           <div className="flex-1 min-w-0">
             <p className="font-bebas text-base text-app-text tracking-wider truncate">{user.display_name}</p>
             <p className="font-inter text-app-muted text-[10px]">

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth, useIsSuperAdmin, useIsGroupAdmin } from '../context/AuthContext'
 import type { Event, Room } from '../types'
+import Avatar from '../components/Avatar'
 
 type EventStatus = 'unrated' | 'waiting' | 'reveal'
 
@@ -14,7 +15,6 @@ interface EventWithStatus extends Event {
 interface Member {
   user_id: string
   display_name: string
-  avatar_emoji: string
 }
 
 export default function RoomDetail() {
@@ -48,12 +48,11 @@ export default function RoomDetail() {
       // Get member profiles
       const memberUserIds = (memberships ?? []).map((m: { user_id: string }) => m.user_id)
       const { data: profiles } = await supabase
-        .from('profiles').select('id, display_name, avatar_emoji').in('id', memberUserIds)
+        .from('profiles').select('id, display_name').in('id', memberUserIds)
       setMembers(
-        (profiles ?? []).map((p: { id: string; display_name: string; avatar_emoji: string }) => ({
+        (profiles ?? []).map((p: { id: string; display_name: string }) => ({
           user_id: p.id,
           display_name: p.display_name,
-          avatar_emoji: p.avatar_emoji ?? '🎤',
         }))
       )
 
@@ -164,12 +163,8 @@ export default function RoomDetail() {
         <div className="card rounded-lg p-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-1.5 flex-wrap">
             {members.map(m => (
-              <div
-                key={m.user_id}
-                className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0"
-                title={m.display_name}
-              >
-                <span className="text-base">{m.avatar_emoji}</span>
+              <div key={m.user_id} title={m.display_name}>
+                <Avatar name={m.display_name} size={32} />
               </div>
             ))}
             {members.length > 0 && (
