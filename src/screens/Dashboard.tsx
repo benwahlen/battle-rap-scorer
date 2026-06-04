@@ -17,14 +17,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [welcomeDismissed, setWelcomeDismissed] = useState(() => localStorage.getItem('brs_welcome_dismissed') === '1')
-  const [welcomeOpen, setWelcomeOpen] = useState(false)
-
-  const dismissWelcome = () => {
-    localStorage.setItem('brs_welcome_dismissed', '1')
-    setWelcomeDismissed(true)
-  }
-
   useEffect(() => {
     if (user) loadRooms()
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -109,51 +101,22 @@ export default function Dashboard() {
           onClick={() => navigate('/profile')}
           className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center"
         >
-          <span className="font-bebas text-primary text-sm">
-            {profile?.display_name?.charAt(0).toUpperCase()}
-          </span>
+          <span className="text-lg">{profile?.avatar_emoji ?? '🎤'}</span>
         </button>
       </div>
 
       <div className="p-4 flex flex-col gap-6">
 
-        {/* ── Welcome Card (nur solange nicht dismissed) ────────────────────── */}
-        {!welcomeDismissed && (
-          <div className="card rounded-lg overflow-hidden border-white/10">
-            <button
-              onClick={() => setWelcomeOpen(o => !o)}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-white/5 transition-colors"
-            >
-              <span className="text-lg flex-shrink-0">👋</span>
-              <span className="font-inter text-app-muted text-xs flex-1">
-                Neu hier? <span className="text-app-text">Was ist Battle Rap Scorer?</span>
-              </span>
-              <span className="text-app-muted text-xs flex-shrink-0">{welcomeOpen ? '▲' : '▾'}</span>
-            </button>
-
-            {welcomeOpen && (
-              <div className="border-t border-white/5 px-4 pb-4 pt-3 flex flex-col gap-3">
-                <h3 className="font-bebas text-lg text-app-text tracking-wider leading-tight">
-                  Willkommen bei Battle Rap Scorer
-                </h3>
-                <p className="font-inter text-app-muted text-sm leading-relaxed">
-                  Du und deine Freunde bewertet Battle Rap Events — unabhängig voneinander, ohne euch
-                  gegenseitig zu beeinflussen. Erst wenn alle fertig sind, gibt es den großen Reveal:
-                  Wer hat welche Runde gewonnen? Wo lagt ihr gleich, wo auseinander?
-                </p>
-                <p className="font-inter text-app-muted text-sm leading-relaxed">
-                  Erstelle eine Gruppe, lade Freunde ein und los geht's.
-                </p>
-                <button
-                  onClick={dismissWelcome}
-                  className="self-start font-inter text-xs text-secondary/80 border border-secondary/20 rounded px-3 py-1.5 active:scale-95 transition-transform mt-1"
-                >
-                  Verstanden ✓
-                </button>
-              </div>
-            )}
+        {/* ── NewsBox ──────────────────────────────────────────────────────────────── */}
+        <div className="card rounded-lg p-4 flex items-start gap-3 border-white/10">
+          <span className="text-xl flex-shrink-0 mt-0.5">📢</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-bebas text-base text-app-text tracking-wider leading-tight">Battle Rap Scorer</p>
+            <p className="font-inter text-app-muted text-xs mt-1 leading-relaxed">
+              Bewertet Battles unabhängig — erst wenn beide fertig sind gibt es den Reveal.
+            </p>
           </div>
-        )}
+        </div>
 
         {/* Gruppen */}
         <div className="flex flex-col gap-3">

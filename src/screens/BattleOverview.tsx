@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { Battle, CategoryKey } from '../types'
 import { CATEGORIES } from '../types'
-import Stepper from '../components/Stepper'
+import Slider from '../components/Slider'
 
 // ── Local score types ────────────────────────────────────────────────────────
 
@@ -29,11 +29,11 @@ interface BattleScore {
 }
 
 const defaultRound = (): RoundScore => ({
-  bars_mc1: 5, bars_mc2: 5,
-  personalisierung_mc1: 5, personalisierung_mc2: 5,
-  delivery_mc1: 5, delivery_mc2: 5,
-  struktur_mc1: 5, struktur_mc2: 5,
-  crowd_mc1: 5, crowd_mc2: 5,
+  bars_mc1: 3, bars_mc2: 3,
+  personalisierung_mc1: 3, personalisierung_mc2: 3,
+  delivery_mc1: 3, delivery_mc2: 3,
+  struktur_mc1: 3, struktur_mc2: 3,
+  crowd_mc1: 3, crowd_mc2: 3,
   round_winner: null, round_comment: '', double_down_category: null,
 })
 
@@ -86,6 +86,7 @@ export default function BattleOverview() {
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [activeBattleId, setActiveBattleId] = useState<string | null>(null)
+  const [otherVerdictStatus, setOtherVerdictStatus] = useState<Record<string, boolean>>({})
 
   useEffect(() => { if (eventId) load() }, [eventId, displayName]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -104,6 +105,16 @@ export default function BattleOverview() {
       const { data: verdicts } = await supabase
         .from('battle_verdicts').select('*').in('battle_id', ids).eq('user_name', displayName)
       const alreadyDone = (verdicts?.length ?? 0) === ids.length
+
+      // Load all verdicts to compute other-user status
+      const { data: allVerdicts } = await supabase
+        .from('battle_verdicts').select('battle_id, user_name').in('battle_id', ids)
+      const otherStatus: Record<string, boolean> = {}
+      for (const b of list) {
+        otherStatus[b.id] = (allVerdicts ?? []).some(v => v.battle_id === b.id && v.user_name !== displayName)
+      }
+      setOtherVerdictStatus(otherStatus)
+
       let init: Record<string, BattleScore> = {}
 
       if (alreadyDone) {
@@ -233,7 +244,9 @@ export default function BattleOverview() {
       <div className="p-4 flex flex-col gap-3 pb-36">
         {battles.map((b, i) => {
           const bs = scores[b.id]
-          const done = bs && isBattleComplete(bs)
+          const myDone = bs && isBattleComplete(bs)
+          const otherDone = otherVerdictStatus[b.id] ?? false
+          const statusVariant = myDone && otherDone ? 'reveal' : myDone ? 'waiting' : otherDone ? 'my_turn' : 'pending'
           const avg = bs ? battleAvg(bs) : null
           return (
             <button key={b.id} onClick={() => setActiveBattleId(b.id)}
@@ -246,17 +259,18 @@ export default function BattleOverview() {
                   <p className="font-bebas text-lg text-app-text tracking-wider truncate leading-tight">
                     {b.mc1} vs {b.mc2}
                   </p>
-                  {done && avg && (
+                  {myDone && avg && (
                     <p className="font-inter text-[10px] text-app-muted mt-1">
                       {b.mc1} Ø {avg.mc1.toFixed(1)} · {b.mc2} Ø {avg.mc2.toFixed(1)}
                     </p>
                   )}
                 </div>
-                <span className={`font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 ${
-                  done ? 'bg-secondary/20 text-secondary' : 'bg-primary/20 text-primary'
-                }`}>
-                  {done ? '✓ Bewertet' : 'Ausstehend'}
-                </span>
+                <div className="flex-shrink-0">
+                  {statusVariant === 'reveal' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-secondary/20 text-secondary">🔓 Reveal</span>}
+                  {statusVariant === 'waiting' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-white/10 text-app-muted">⏳ Wartet</span>}
+                  {statusVariant === 'my_turn' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-accent/20 text-accent animate-pulse">⚡ Nur noch du</span>}
+                  {statusVariant === 'pending' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-primary/20 text-primary">Ausstehend</span>}
+                </div>
               </div>
             </button>
           )
@@ -300,6 +314,8 @@ interface SingleBattleProps {
 }
 
 function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, onBack }: SingleBattleProps) {
+  const [saveError, setSaveError] = useState<string | null>(null)
+
   const setScoreVal = (round: number, field: keyof Omit<RoundScore, 'round_winner' | 'round_comment' | 'double_down_category'>, value: number) =>
     onChange({ ...score, rounds: { ...score.rounds, [round]: { ...score.rounds[round], [field]: value } } })
 
@@ -317,6 +333,17 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
   const setOverallWinner = (w: OverallWinner) => onChange({ ...score, overall_winner: w })
   const setBattleComment = (c: string) => onChange({ ...score, battle_comment: c })
   const avg = battleAvg(score)
+
+  const handleSaveAndBack = () => {
+    const allRoundsDone = [1, 2, 3].every(r => score.rounds[r]?.round_winner !== null)
+    const overallDone = score.overall_winner !== null
+    if (!allRoundsDone || !overallDone) {
+      setSaveError('Bitte Sieger für alle Runden und Gesamtsieger wählen.')
+      return
+    }
+    setSaveError(null)
+    onBack()
+  }
 
   return (
     <div className="min-h-screen">
@@ -355,33 +382,31 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
                   const isDoubled = rs.double_down_category === cat.key
 
                   return (
-                    <div key={cat.key}
-                      className={`rounded-lg p-2 transition-all ${isDoubled ? 'double-down-active' : ''}`}>
-                      {/* Category label + 2x button */}
+                    <div key={cat.key} className={`rounded-lg p-2 ${isDoubled ? 'double-down-active' : ''}`}>
+                      {/* Label + 2x Button */}
                       <div className="flex items-center justify-center gap-2 mb-2">
-                        <span className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted text-center">
-                          {cat.label}
-                        </span>
-                        <button
-                          onClick={() => toggleDoubleDown(round, cat.key)}
+                        <span className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted">{cat.label}</span>
+                        <button onClick={() => toggleDoubleDown(round, cat.key)}
                           className={`font-bebas text-xs px-2 py-0.5 rounded tracking-wider transition-colors ${
                             isDoubled ? 'bg-primary text-white shadow-sm shadow-primary/50' : 'bg-white/10 text-app-muted'
                           }`}>
                           2×
                         </button>
                       </div>
-                      {/* Stepper row: MC1-name | stepper | divider | stepper | MC2-name */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1px auto 1fr', gap: '0 0.5rem' }}
-                        className="items-center overflow-hidden">
-                        <span className="font-inter text-[9px] uppercase tracking-wider text-app-muted text-right truncate pr-1">
-                          {battle.mc1}
-                        </span>
-                        <Stepper value={rs[mc1Key] as number} onChange={v => setScoreVal(round, mc1Key, v)} />
-                        <div className="self-stretch" style={{ background: 'rgba(255,255,255,0.1)', margin: '4px 8px' }} />
-                        <Stepper value={rs[mc2Key] as number} onChange={v => setScoreVal(round, mc2Key, v)} />
-                        <span className="font-inter text-[9px] uppercase tracking-wider text-app-muted text-left truncate pl-1">
-                          {battle.mc2}
-                        </span>
+                      {/* Zwei Slider nebeneinander */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <Slider
+                          mc={battle.mc1}
+                          value={rs[mc1Key] as number}
+                          onChange={v => setScoreVal(round, mc1Key, v)}
+                          isLeading={(rs[mc1Key] as number) >= (rs[mc2Key] as number)}
+                        />
+                        <Slider
+                          mc={battle.mc2}
+                          value={rs[mc2Key] as number}
+                          onChange={v => setScoreVal(round, mc2Key, v)}
+                          isLeading={(rs[mc2Key] as number) > (rs[mc1Key] as number)}
+                        />
                       </div>
                     </div>
                   )
@@ -488,10 +513,12 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-app-bg/90 backdrop-blur border-t border-white/5">
-        <button onClick={onBack}
-          className="w-full bg-white/10 text-app-text font-bebas py-4 rounded-lg tracking-[2px] text-sm active:scale-95 transition-transform">
-          ← Zur Übersicht
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-app-bg/90 backdrop-blur border-t border-white/5 flex flex-col gap-2">
+        {saveError && <p className="font-inter text-accent text-xs text-center">{saveError}</p>}
+        <button onClick={handleSaveAndBack}
+          className="w-full font-bebas text-white py-4 rounded-lg tracking-[2px] text-base active:scale-95 transition-transform shadow-lg"
+          style={{ background: 'linear-gradient(135deg, #7C3AED, #0EA5E9)' }}>
+          Speichern und zur Übersicht
         </button>
       </div>
     </div>

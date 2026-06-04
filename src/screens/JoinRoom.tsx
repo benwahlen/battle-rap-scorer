@@ -77,6 +77,7 @@ export default function JoinRoom() {
     setState('joining')
     setDebugError(null)
     try {
+      console.log('[JoinRoom] Inserting...', { room_id: roomId, user_id: user?.id })
       const { error } = await supabase
         .from('room_members').insert({ room_id: roomId, user_id: user!.id })
       if (error) {
@@ -86,8 +87,11 @@ export default function JoinRoom() {
         setState('error')
         return
       }
+      console.log('[JoinRoom] Insert OK, refreshing session...')
+      await supabase.auth.refreshSession()
+      console.log('[JoinRoom] Navigating to room:', roomId)
       setState('done')
-      setTimeout(() => navigate(`/room/${roomId}`, { replace: true }), 1200)
+      setTimeout(() => navigate(`/room/${roomId}`, { replace: true }), 800)
     } catch (e) {
       console.error('[JoinRoom] joinRoom unexpected error:', e)
       setDebugError(e instanceof Error ? e.message : JSON.stringify(e))

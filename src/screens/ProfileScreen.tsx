@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth, useIsSuperAdmin } from '../context/AuthContext'
 
+const EMOJIS = ['🎤','🎵','🎧','🔥','⚡','💜','🦁','👑','🐉','💀','🌟','🎯','🏆','💎','🗡️','🎭','🌊','🌙','☀️','🦅','🐺','🦊','🐯','🦋','🌺','🍀','⭐','🎪','🎨','🎲']
+
 export default function ProfileScreen() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
@@ -13,6 +15,8 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false)
   const [nameError, setNameError] = useState<string | null>(null)
   const [nameSuccess, setNameSuccess] = useState(false)
+  const [showPicker, setShowPicker] = useState(false)
+  const [avatarEmoji, setAvatarEmoji] = useState(profile?.avatar_emoji ?? '🎤')
 
   const handleSaveName = async () => {
     if (!newName.trim() || newName.trim() === profile?.display_name) {
@@ -45,6 +49,12 @@ export default function ProfileScreen() {
     }
   }
 
+  const handleSaveEmoji = async (emoji: string) => {
+    setAvatarEmoji(emoji)
+    setShowPicker(false)
+    await supabase.from('profiles').update({ avatar_emoji: emoji }).eq('id', user!.id)
+  }
+
   const handleLogout = async () => {
     await signOut()
     navigate('/', { replace: true })
@@ -64,11 +74,14 @@ export default function ProfileScreen() {
       <div className="p-4 flex flex-col gap-6 max-w-sm">
         {/* Avatar */}
         <div className="flex flex-col items-center gap-3 pt-4">
-          <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center">
-            <span className="font-bebas text-primary text-4xl">
-              {profile?.display_name?.charAt(0).toUpperCase()}
-            </span>
+          <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+            onClick={() => setShowPicker(true)}>
+            <span className="text-4xl">{avatarEmoji}</span>
           </div>
+          <button onClick={() => setShowPicker(true)}
+            className="font-inter text-primary text-xs underline">
+            Avatar ändern
+          </button>
           <p className="font-bebas text-2xl text-app-text tracking-wider">{profile?.display_name}</p>
           <p className="font-inter text-app-muted text-xs">Mitglied seit {joinedDate}</p>
         </div>
@@ -138,6 +151,24 @@ export default function ProfileScreen() {
           Ausloggen
         </button>
       </div>
+
+      {/* Emoji Picker Modal (Bottom Sheet) */}
+      {showPicker && (
+        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowPicker(false)}>
+          <div className="w-full bg-app-bg border-t border-white/10 p-4 pb-8 rounded-t-2xl" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-4" />
+            <p className="font-bebas text-lg text-app-text tracking-wider text-center mb-4">Avatar wählen</p>
+            <div className="grid grid-cols-6 gap-3">
+              {EMOJIS.map(e => (
+                <button key={e} onClick={() => handleSaveEmoji(e)}
+                  className={`text-3xl py-2 rounded-lg transition-colors active:scale-90 ${avatarEmoji === e ? 'bg-primary/20 ring-1 ring-primary' : 'bg-white/5'}`}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

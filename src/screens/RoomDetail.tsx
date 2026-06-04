@@ -14,6 +14,7 @@ interface EventWithStatus extends Event {
 interface Member {
   user_id: string
   display_name: string
+  avatar_emoji: string
 }
 
 export default function RoomDetail() {
@@ -47,11 +48,12 @@ export default function RoomDetail() {
       // Get member profiles
       const memberUserIds = (memberships ?? []).map((m: { user_id: string }) => m.user_id)
       const { data: profiles } = await supabase
-        .from('profiles').select('id, display_name').in('id', memberUserIds)
+        .from('profiles').select('id, display_name, avatar_emoji').in('id', memberUserIds)
       setMembers(
-        (profiles ?? []).map((p: { id: string; display_name: string }) => ({
+        (profiles ?? []).map((p: { id: string; display_name: string; avatar_emoji: string }) => ({
           user_id: p.id,
           display_name: p.display_name,
+          avatar_emoji: p.avatar_emoji ?? '🎤',
         }))
       )
 
@@ -167,7 +169,7 @@ export default function RoomDetail() {
                 className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0"
                 title={m.display_name}
               >
-                <span className="font-bebas text-primary text-xs">{m.display_name.charAt(0).toUpperCase()}</span>
+                <span className="text-base">{m.avatar_emoji}</span>
               </div>
             ))}
             {members.length > 0 && (
