@@ -9,7 +9,7 @@ export interface Profile {
   id: string
   display_name: string
   role: UserRole
-  avatar_emoji: string
+  avatar_index: number
 }
 
 interface AuthContextValue {
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, role, avatar_emoji')
+        .select('id, display_name, role, avatar_index')
         .eq('id', authUser.id)
         .single()
 
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: created } = await supabase
         .from('profiles')
         .insert({ id: authUser.id, display_name: displayName })
-        .select('id, display_name, role, avatar_emoji')
+        .select('id, display_name, role, avatar_index')
         .single()
 
       if (created) setProfile(created as Profile)

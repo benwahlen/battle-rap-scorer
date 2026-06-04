@@ -15,6 +15,7 @@ interface EventWithStatus extends Event {
 interface Member {
   user_id: string
   display_name: string
+  avatar_index: number
 }
 
 export default function RoomDetail() {
@@ -48,11 +49,12 @@ export default function RoomDetail() {
       // Get member profiles
       const memberUserIds = (memberships ?? []).map((m: { user_id: string }) => m.user_id)
       const { data: profiles } = await supabase
-        .from('profiles').select('id, display_name').in('id', memberUserIds)
+        .from('profiles').select('id, display_name, avatar_index').in('id', memberUserIds)
       setMembers(
-        (profiles ?? []).map((p: { id: string; display_name: string }) => ({
+        (profiles ?? []).map((p: { id: string; display_name: string; avatar_index: number }) => ({
           user_id: p.id,
           display_name: p.display_name,
+          avatar_index: p.avatar_index ?? 0,
         }))
       )
 
@@ -164,7 +166,7 @@ export default function RoomDetail() {
           <div className="flex items-center gap-1.5 flex-wrap">
             {members.map(m => (
               <div key={m.user_id} title={m.display_name}>
-                <Avatar name={m.display_name} size={32} />
+                <Avatar name={m.display_name} avatarIndex={m.avatar_index} size={32} />
               </div>
             ))}
             {members.length > 0 && (

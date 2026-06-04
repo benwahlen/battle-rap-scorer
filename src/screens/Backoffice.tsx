@@ -208,6 +208,8 @@ function EventsTab() {
 
   useEffect(() => { load() }, [load])
 
+  const [releasedIds, setReleasedIds] = useState<Set<string>>(new Set())
+
   const toggleEvent = async (eventId: string) => {
     if (expandedId === eventId) { setExpandedId(null); return }
     setExpandedId(eventId)
@@ -215,6 +217,13 @@ function EventsTab() {
       const { data } = await supabase.from('battles').select('*').eq('event_id', eventId).order('position')
       setBattlesMap(prev => ({ ...prev, [eventId]: (data ?? []) as Battle[] }))
     }
+  }
+
+  const releaseVoting = async (eventId: string) => {
+    const { error: err } = await supabase.from('events')
+      .update({ voting_released_at: new Date().toISOString() })
+      .eq('id', eventId)
+    if (!err) setReleasedIds(prev => new Set([...prev, eventId]))
   }
 
   return (
@@ -258,6 +267,15 @@ function EventsTab() {
 
           {expandedId === event.id && (
             <div className="border-t border-white/5 px-4 py-3 flex flex-col gap-2">
+              {!releasedIds.has(event.id) && (
+                <button onClick={() => releaseVoting(event.id)}
+                  className="w-full card border-secondary/20 rounded-lg py-2 font-bebas text-secondary tracking-[1px] text-sm active:scale-95 transition-transform">
+                  🔓 Voting jetzt freigeben
+                </button>
+              )}
+              {releasedIds.has(event.id) && (
+                <p className="font-inter text-secondary text-xs text-center py-1">✓ Voting freigegeben</p>
+              )}
               {!battlesMap[event.id] ? (
                 <div className="flex justify-center py-3">
                   <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />

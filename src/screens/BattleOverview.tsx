@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import type { Battle, CategoryKey } from '../types'
+import type { Battle, CategoryKey, EventMode } from '../types'
 import { CATEGORIES } from '../types'
 import Slider from '../components/Slider'
+import { canVote, formatVotingDate } from '../lib/eventUtils'
 
 // ── Local score types ────────────────────────────────────────────────────────
 
@@ -79,6 +80,9 @@ export default function BattleOverview() {
   const displayName = profile?.display_name ?? ''
 
   const [eventName, setEventName] = useState('')
+  const [eventMode, setEventMode] = useState<EventMode>('heads_up')
+  const [votingOpensAt, setVotingOpensAt] = useState<string | null>(null)
+  const [votingReleasedAt, setVotingReleasedAt] = useState<string | null>(null)
   const [battles, setBattles] = useState<Battle[]>([])
   const [scores, setScores] = useState<Record<string, BattleScore>>({})
   const [loading, setLoading] = useState(true)
@@ -93,10 +97,13 @@ export default function BattleOverview() {
   async function load() {
     try {
       const [{ data: event }, { data: battlesData }] = await Promise.all([
-        supabase.from('events').select('name').eq('id', eventId).single(),
+        supabase.from('events').select('name, mode, voting_opens_at, voting_released_at').eq('id', eventId).single(),
         supabase.from('battles').select('*').eq('event_id', eventId).order('position'),
       ])
       setEventName(event?.name ?? '')
+      setEventMode((event?.mode as EventMode) ?? 'heads_up')
+      setVotingOpensAt(event?.voting_opens_at ?? null)
+      setVotingReleasedAt(event?.voting_released_at ?? null)
       const list: Battle[] = battlesData ?? []
       setBattles(list)
       const ids = list.map(b => b.id)
@@ -192,7 +199,9 @@ export default function BattleOverview() {
       const otherDone = otherNames.some(name =>
         (allOtherVerdicts ?? []).filter((v: { user_name: string }) => v.user_name === name).length === battles.length
       )
-      if (otherDone) {
+      if (eventMode === 'community') {
+        navigate(`/room/${roomId}/reveal/${eventId}`, { replace: true })
+      } else if (otherDone) {
         navigate(`/room/${roomId}/reveal/${eventId}`, { replace: true })
       } else {
         navigate(`/room/${roomId}/wait/${eventId}`, { replace: true })
@@ -248,9 +257,12 @@ export default function BattleOverview() {
           const otherDone = otherVerdictStatus[b.id] ?? false
           const statusVariant = myDone && otherDone ? 'reveal' : myDone ? 'waiting' : otherDone ? 'my_turn' : 'pending'
           const avg = bs ? battleAvg(bs) : null
+          const votingAllowed = canVote({ voting_opens_at: votingOpensAt, voting_released_at: votingReleasedAt })
           return (
-            <button key={b.id} onClick={() => setActiveBattleId(b.id)}
-              className="card rounded-lg p-4 text-left active:scale-95 transition-transform w-full">
+            <button key={b.id}
+              onClick={() => votingAllowed ? setActiveBattleId(b.id) : undefined}
+              disabled={!votingAllowed}
+              className={`card rounded-lg p-4 text-left transition-transform w-full ${votingAllowed ? 'active:scale-95' : 'opacity-60 cursor-default'}`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.1em] mb-0.5">
@@ -266,10 +278,18 @@ export default function BattleOverview() {
                   )}
                 </div>
                 <div className="flex-shrink-0">
-                  {statusVariant === 'reveal' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-secondary/20 text-secondary">🔓 Reveal</span>}
-                  {statusVariant === 'waiting' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-white/10 text-app-muted">⏳ Wartet</span>}
-                  {statusVariant === 'my_turn' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-accent/20 text-accent animate-pulse">⚡ Nur noch du</span>}
-                  {statusVariant === 'pending' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-primary/20 text-primary">Ausstehend</span>}
+                  {!votingAllowed ? (
+                    <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] bg-white/5 text-app-muted">
+                      🔒 {votingOpensAt ? formatVotingDate(votingOpensAt) : 'Gesperrt'}
+                    </span>
+                  ) : (
+                    <>
+                      {statusVariant === 'reveal' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-secondary/20 text-secondary">🔓 Reveal</span>}
+                      {statusVariant === 'waiting' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-white/10 text-app-muted">⏳ Wartet</span>}
+                      {statusVariant === 'my_turn' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-accent/20 text-accent animate-pulse">⚡ Nur noch du</span>}
+                      {statusVariant === 'pending' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-primary/20 text-primary">Ausstehend</span>}
+                    </>
+                  )}
                 </div>
               </div>
             </button>

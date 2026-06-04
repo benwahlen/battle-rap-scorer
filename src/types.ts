@@ -1,5 +1,6 @@
 export type UserRole = 'member' | 'group_admin' | 'super_admin'
 export type RoomMemberRole = 'member' | 'admin'
+export type EventMode = 'heads_up' | 'community' | 'expert'
 
 export interface Room {
   id: string
@@ -32,6 +33,10 @@ export interface Event {
   location: string | null
   room_id: string | null
   created_at: string
+  mode: EventMode
+  expert_user_id: string | null
+  voting_opens_at: string | null
+  voting_released_at: string | null
 }
 
 export interface Battle {

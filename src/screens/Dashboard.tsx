@@ -102,7 +102,7 @@ export default function Dashboard() {
           onClick={() => navigate('/profile')}
           className="rounded-full active:scale-95 transition-transform"
         >
-          <Avatar name={profile?.display_name ?? ''} size={36} />
+          <Avatar name={profile?.display_name ?? ''} avatarIndex={profile?.avatar_index} size={36} />
         </button>
       </div>
 
