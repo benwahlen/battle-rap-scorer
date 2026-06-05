@@ -81,6 +81,7 @@ export default function BattleOverview() {
 
   const [eventName, setEventName] = useState('')
   const [eventMode, setEventMode] = useState<EventMode>('heads_up')
+  const [lockedMode, setLockedMode] = useState<EventMode | null>(null)
   const [votingOpensAt, setVotingOpensAt] = useState<string | null>(null)
   const [votingReleasedAt, setVotingReleasedAt] = useState<string | null>(null)
   const [battles, setBattles] = useState<Battle[]>([])
@@ -96,17 +97,20 @@ export default function BattleOverview() {
 
   async function load() {
     try {
-      const [{ data: event }, { data: battlesData }, { data: room }, { data: members }] = await Promise.all([
+      const [{ data: event }, { data: battlesData }, { data: room }, { data: members }, { data: roomEvent }] = await Promise.all([
         supabase.from('events').select('name, voting_opens_at, voting_released_at').eq('id', eventId).single(),
         supabase.from('battles').select('*').eq('event_id', eventId).order('position'),
         roomId ? supabase.from('rooms').select('mode, expert_user_id').eq('id', roomId).single() : Promise.resolve({ data: null, error: null }),
         roomId ? supabase.from('room_members').select('id').eq('room_id', roomId) : Promise.resolve({ data: [], error: null }),
+        (roomId && eventId) ? supabase.from('room_events').select('locked_mode').eq('room_id', roomId).eq('event_id', eventId).maybeSingle() : Promise.resolve({ data: null, error: null }),
       ])
       setEventName(event?.name ?? '')
       setVotingOpensAt(event?.voting_opens_at ?? null)
       setVotingReleasedAt(event?.voting_released_at ?? null)
+      const locked = (roomEvent?.locked_mode as EventMode | null) ?? null
+      setLockedMode(locked)
       const roomMode: RoomMode = (room?.mode as RoomMode) ?? 'auto'
-      setEventMode(getRoomMode(roomMode, members?.length ?? 2))
+      setEventMode(getRoomMode(roomMode, members?.length ?? 2, locked))
       const list: Battle[] = battlesData ?? []
       setBattles(list)
       const ids = list.map(b => b.id)
@@ -193,6 +197,14 @@ export default function BattleOverview() {
         }, { onConflict: 'battle_id,user_name' })
         if (ve) throw ve
       }
+      // Modus beim ersten Submit einfrieren (locked_mode noch nicht gesetzt)
+      if (!lockedMode && roomId && eventId) {
+        await supabase.from('room_events')
+          .update({ locked_mode: eventMode })
+          .eq('room_id', roomId)
+          .eq('event_id', eventId)
+      }
+
       // Check if any OTHER user has already completed all battles
       const { data: allOtherVerdicts } = await supabase
         .from('battle_verdicts').select('battle_id, user_name')

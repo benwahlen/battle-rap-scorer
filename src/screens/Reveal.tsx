@@ -318,15 +318,17 @@ export default function Reveal() {
   useEffect(() => {
     async function load() {
       try {
-        const [{ data: event }, { data: battles }, { data: room }, { data: members }] = await Promise.all([
+        const [{ data: event }, { data: battles }, { data: room }, { data: members }, { data: roomEvent }] = await Promise.all([
           supabase.from('events').select('name').eq('id', eventId).single(),
           supabase.from('battles').select('*').eq('event_id', eventId).order('position'),
           roomId ? supabase.from('rooms').select('mode, expert_user_id').eq('id', roomId).single() : Promise.resolve({ data: null, error: null }),
           roomId ? supabase.from('room_members').select('id').eq('room_id', roomId) : Promise.resolve({ data: [], error: null }),
+          (roomId && eventId) ? supabase.from('room_events').select('locked_mode').eq('room_id', roomId).eq('event_id', eventId).maybeSingle() : Promise.resolve({ data: null, error: null }),
         ])
         setEventName(event?.name ?? '')
+        const locked = (roomEvent?.locked_mode as EventMode | null) ?? null
         const roomMode: RoomMode = (room?.mode as RoomMode) ?? 'auto'
-        const mode = getRoomMode(roomMode, members?.length ?? 2)
+        const mode = getRoomMode(roomMode, members?.length ?? 2, locked)
         setEventMode(mode)
 
         if (mode === 'expert' && room?.expert_user_id) {

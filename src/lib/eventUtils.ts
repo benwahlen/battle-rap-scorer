@@ -18,8 +18,17 @@ export function formatVotingDate(dateStr: string): string {
   })
 }
 
-/** Bestimmt den effektiven Bewertungsmodus zur Laufzeit aus Raum-Modus + Mitgliederzahl. */
-export function getRoomMode(roomMode: RoomMode, memberCount: number): EventMode {
+/**
+ * Bestimmt den effektiven Bewertungsmodus.
+ * Priorität: 1) lockedMode (aus room_events) wenn gesetzt
+ *            2) live aus roomMode + memberCount berechnen
+ */
+export function getRoomMode(
+  roomMode: RoomMode,
+  memberCount: number,
+  lockedMode?: EventMode | null,
+): EventMode {
+  if (lockedMode) return lockedMode
   if (roomMode === 'expert') return 'expert'
   return memberCount >= 3 ? 'community' : 'heads_up'
 }
