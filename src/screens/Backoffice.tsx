@@ -168,6 +168,13 @@ function UsersTab() {
 
 // ── Tab: Events ───────────────────────────────────────────────────────────────
 
+interface EditForm {
+  name: string
+  date: string
+  location: string
+  voting_opens_at: string
+}
+
 function EventsTab() {
   const navigate = useNavigate()
   const [events, setEvents] = useState<EventRow[]>([])
@@ -175,6 +182,11 @@ function EventsTab() {
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [battlesMap, setBattlesMap] = useState<Record<string, Battle[]>>({})
+
+  const [editingEvent, setEditingEvent] = useState<EventRow | null>(null)
+  const [editForm, setEditForm] = useState<EditForm>({ name: '', date: '', location: '', voting_opens_at: '' })
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -229,6 +241,57 @@ function EventsTab() {
     if (!err) setReleasedIds(prev => new Set([...prev, eventId]))
   }
 
+  const openEdit = (event: EventRow) => {
+    setEditForm({
+      name: event.name,
+      date: event.date ?? '',
+      location: event.location ?? '',
+      voting_opens_at: event.voting_opens_at
+        ? new Date(event.voting_opens_at).toISOString().slice(0, 16)
+        : '',
+    })
+    setEditingEvent(event)
+  }
+
+  const saveEdit = async () => {
+    if (!editingEvent || !editForm.name.trim()) return
+    setSaving(true)
+    const { error: err } = await supabase.from('events')
+      .update({
+        name: editForm.name.trim(),
+        date: editForm.date.trim() || null,
+        location: editForm.location.trim() || null,
+        voting_opens_at: editForm.voting_opens_at
+          ? new Date(editForm.voting_opens_at).toISOString()
+          : null,
+      })
+      .eq('id', editingEvent.id)
+    if (!err) {
+      setEvents(prev => prev.map(e => e.id === editingEvent.id ? {
+        ...e,
+        name: editForm.name.trim(),
+        date: editForm.date.trim() || null,
+        location: editForm.location.trim() || null,
+        voting_opens_at: editForm.voting_opens_at
+          ? new Date(editForm.voting_opens_at).toISOString()
+          : null,
+      } : e))
+      setEditingEvent(null)
+    }
+    setSaving(false)
+  }
+
+  const deleteEvent = async (eventId: string, eventName: string) => {
+    if (!confirm(`Event „${eventName}" und alle Bewertungen unwiderruflich löschen?`)) return
+    setDeletingId(eventId)
+    const { error: err } = await supabase.from('events').delete().eq('id', eventId)
+    if (!err) {
+      setEvents(prev => prev.filter(e => e.id !== eventId))
+      if (expandedId === eventId) setExpandedId(null)
+    }
+    setDeletingId(null)
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <button
@@ -270,6 +333,19 @@ function EventsTab() {
 
           {expandedId === event.id && (
             <div className="border-t border-white/5 px-4 py-3 flex flex-col gap-2">
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <button onClick={() => openEdit(event)}
+                  className="flex-1 card rounded-lg py-2 font-bebas text-app-text tracking-[1px] text-sm active:scale-95 transition-transform">
+                  Bearbeiten
+                </button>
+                <button onClick={() => deleteEvent(event.id, event.name)}
+                  disabled={deletingId === event.id}
+                  className="flex-1 card border-red-800/40 rounded-lg py-2 font-bebas text-red-400 tracking-[1px] text-sm active:scale-95 transition-transform disabled:opacity-50">
+                  {deletingId === event.id ? '…' : 'Event löschen'}
+                </button>
+              </div>
+
               {isVotingLocked(event) && !releasedIds.has(event.id) && (
                 <button onClick={() => releaseVoting(event.id)}
                   className="w-full card border-secondary/20 rounded-lg py-2 font-bebas text-secondary tracking-[1px] text-sm active:scale-95 transition-transform">
@@ -303,6 +379,65 @@ function EventsTab() {
 
       {!loading && events.length === 0 && (
         <p className="font-inter text-app-muted text-sm text-center py-8">Noch keine Events vorhanden.</p>
+      )}
+
+      {/* Edit Modal */}
+      {editingEvent && (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={() => setEditingEvent(null)}>
+          <div className="w-full bg-app-bg border-t border-white/10 rounded-t-2xl p-4 pb-8 flex flex-col gap-3"
+            onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-1" />
+            <p className="font-bebas text-lg text-app-text tracking-wider">Event bearbeiten</p>
+
+            <div className="flex flex-col gap-2">
+              <label className="font-inter text-[10px] text-app-muted uppercase tracking-[0.1em]">Name *</label>
+              <input
+                value={editForm.name}
+                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2.5 text-app-text font-inter text-sm focus:outline-none focus:border-primary/50"
+              />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex flex-col gap-2 flex-1">
+                <label className="font-inter text-[10px] text-app-muted uppercase tracking-[0.1em]">Datum</label>
+                <input
+                  value={editForm.date}
+                  onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))}
+                  placeholder="z.B. 15.06.2025"
+                  className="w-full bg-white/5 border border-white/10 rounded px-3 py-2.5 text-app-text font-inter text-sm focus:outline-none focus:border-primary/50"
+                />
+              </div>
+              <div className="flex flex-col gap-2 flex-1">
+                <label className="font-inter text-[10px] text-app-muted uppercase tracking-[0.1em]">Ort</label>
+                <input
+                  value={editForm.location}
+                  onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 rounded px-3 py-2.5 text-app-text font-inter text-sm focus:outline-none focus:border-primary/50"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="font-inter text-[10px] text-app-muted uppercase tracking-[0.1em]">Voting freigeben ab (leer = sofort)</label>
+              <input
+                type="datetime-local"
+                value={editForm.voting_opens_at}
+                onChange={e => setEditForm(f => ({ ...f, voting_opens_at: e.target.value }))}
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2.5 text-app-text font-inter text-sm focus:outline-none focus:border-primary/50"
+              />
+            </div>
+
+            <div className="flex gap-2 mt-1">
+              <button onClick={() => setEditingEvent(null)}
+                className="flex-1 card rounded-lg py-3 font-bebas text-app-muted tracking-[1px] text-sm active:scale-95 transition-transform">
+                Abbrechen
+              </button>
+              <button onClick={saveEdit} disabled={saving || !editForm.name.trim()}
+                className="flex-1 bg-primary rounded-lg py-3 font-bebas text-white tracking-[1px] text-sm active:scale-95 transition-transform disabled:opacity-50">
+                {saving ? 'Speichert…' : 'Speichern'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

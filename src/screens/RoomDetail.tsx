@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth, useIsSuperAdmin } from '../context/AuthContext'
+import { useAuth, useIsSuperAdmin, useIsGroupAdmin } from '../context/AuthContext'
 import type { Event, Room } from '../types'
 import Avatar from '../components/Avatar'
 
@@ -23,6 +23,8 @@ export default function RoomDetail() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const isSuperAdmin = useIsSuperAdmin()
+  const isRoomAdmin = useIsGroupAdmin(roomId)
+  const canManageEvents = isSuperAdmin || isRoomAdmin
 
   const [room, setRoom] = useState<Room | null>(null)
   const [members, setMembers] = useState<Member[]>([])
@@ -30,6 +32,7 @@ export default function RoomDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [removingEventId, setRemovingEventId] = useState<string | null>(null)
 
   const displayName = profile?.display_name ?? ''
 
@@ -123,6 +126,17 @@ export default function RoomDetail() {
     else navigate(`/room/${roomId}/score/${eventId}`)
   }
 
+  const removeFromRoom = async (eventId: string, eventName: string) => {
+    if (!confirm(`Event „${eventName}" aus dieser Gruppe entfernen? Bewertungen bleiben erhalten.`)) return
+    setRemovingEventId(eventId)
+    const { error: err } = await supabase
+      .from('room_events').delete()
+      .eq('room_id', roomId).eq('event_id', eventId)
+    if (!err) setEvents(prev => prev.filter(e => e.id !== eventId))
+    else setError('Fehler beim Entfernen des Events.')
+    setRemovingEventId(null)
+  }
+
   const statusBadge = (status: EventStatus) => {
     if (status === 'reveal')
       return <span className="font-inter text-[10px] bg-accent/20 text-accent px-2.5 py-1 rounded uppercase tracking-[0.1em]">🔓 Reveal</span>
@@ -206,26 +220,38 @@ export default function RoomDetail() {
 
         <div className="flex flex-col gap-3">
           {events.map(event => (
-            <button
-              key={event.id}
-              onClick={() => openEvent(event.id, event.status)}
-              className="card rounded-lg p-4 text-left active:scale-95 transition-transform w-full"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <h2 className="font-bebas text-lg text-app-text truncate tracking-wider leading-tight">{event.name}</h2>
-                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    {event.date && <span className="font-inter text-app-muted text-xs">{event.date}</span>}
-                    {event.date && event.location && <span className="text-app-muted">·</span>}
-                    {event.location && <span className="font-inter text-app-muted text-xs">{event.location}</span>}
+            <div key={event.id} className="card rounded-lg overflow-hidden">
+              <button
+                onClick={() => openEvent(event.id, event.status)}
+                className="w-full p-4 text-left active:bg-white/5 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="font-bebas text-lg text-app-text truncate tracking-wider leading-tight">{event.name}</h2>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      {event.date && <span className="font-inter text-app-muted text-xs">{event.date}</span>}
+                      {event.date && event.location && <span className="text-app-muted">·</span>}
+                      {event.location && <span className="font-inter text-app-muted text-xs">{event.location}</span>}
+                    </div>
+                    <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted/60 mt-1">
+                      {event.battleCount} {event.battleCount === 1 ? 'Battle' : 'Battles'}
+                    </p>
                   </div>
-                  <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted/60 mt-1">
-                    {event.battleCount} {event.battleCount === 1 ? 'Battle' : 'Battles'}
-                  </p>
+                  <div className="flex-shrink-0 mt-0.5">{statusBadge(event.status)}</div>
                 </div>
-                <div className="flex-shrink-0 mt-0.5">{statusBadge(event.status)}</div>
-              </div>
-            </button>
+              </button>
+              {canManageEvents && (
+                <div className="border-t border-white/5 px-4 py-2 flex justify-end">
+                  <button
+                    onClick={() => removeFromRoom(event.id, event.name)}
+                    disabled={removingEventId === event.id}
+                    className="font-inter text-[10px] text-red-400/70 hover:text-red-400 uppercase tracking-[0.1em] disabled:opacity-40 transition-colors active:scale-95"
+                  >
+                    {removingEventId === event.id ? '…' : '✕ Entfernen'}
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>
