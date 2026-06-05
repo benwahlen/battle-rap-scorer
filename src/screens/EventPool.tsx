@@ -37,17 +37,11 @@ export default function EventPool() {
     setLoading(true)
     setError(null)
     try {
-      const { data: adminProfiles } = await supabase
-        .from('profiles').select('id').eq('role', 'super_admin')
-      const adminIds = (adminProfiles ?? []).map((p: { id: string }) => p.id)
-
       const [{ data: evData, error: evErr }, { data: memberData }] = await Promise.all([
-        adminIds.length > 0
-          ? supabase.from('events').select('id, name, date, location')
-              .in('created_by', adminIds).order('created_at', { ascending: false })
-          : Promise.resolve({ data: [], error: null }),
+        supabase.from('events').select('id, name, date, location').order('created_at', { ascending: false }),
         supabase.from('room_members').select('room_id').eq('user_id', user.id),
       ])
+      console.error('[EventPool] evData:', evData, 'evErr:', evErr)
       if (evErr) throw evErr
 
       const roomIds = (memberData ?? []).map((m: { room_id: string }) => m.room_id)
