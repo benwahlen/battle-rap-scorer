@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth, useIsSuperAdmin, useIsGroupAdmin } from '../context/AuthContext'
+import { useAuth, useIsSuperAdmin } from '../context/AuthContext'
 import type { Event, Room } from '../types'
 import Avatar from '../components/Avatar'
 
@@ -23,7 +23,6 @@ export default function RoomDetail() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const isSuperAdmin = useIsSuperAdmin()
-  const isRoomAdmin = useIsGroupAdmin(roomId)
 
   const [room, setRoom] = useState<Room | null>(null)
   const [members, setMembers] = useState<Member[]>([])
