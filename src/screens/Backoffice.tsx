@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth, useIsSuperAdmin } from '../context/AuthContext'
+import { isVotingLocked } from '../lib/eventUtils'
 import type { UserRole, Battle } from '../types'
 import Avatar from '../components/Avatar'
 
@@ -22,6 +23,8 @@ interface EventRow {
   created_at: string
   roomCount: number
   roomNames: string[]
+  voting_opens_at: string | null
+  voting_released_at: string | null
 }
 
 interface RoomRow {
@@ -177,7 +180,7 @@ function EventsTab() {
     setLoading(true)
     setError(null)
     const [{ data: evData, error: evErr }, { data: reData, error: reErr }] = await Promise.all([
-      supabase.from('events').select('id, name, date, location, room_id, created_at').order('created_at', { ascending: false }),
+      supabase.from('events').select('id, name, date, location, room_id, created_at, voting_opens_at, voting_released_at').order('created_at', { ascending: false }),
       supabase.from('room_events').select('event_id, room_id, rooms(name)'),
     ])
     if (evErr) { setError('Fehler beim Laden.'); setLoading(false); return }
@@ -195,12 +198,12 @@ function EventsTab() {
     }
 
     setEvents(
-      (evData ?? []).map((e: { id: string; name: string; date: string | null; location: string | null; room_id: string | null; created_at: string }) => {
+      (evData ?? []).map((e: { id: string; name: string; date: string | null; location: string | null; room_id: string | null; created_at: string; voting_opens_at: string | null; voting_released_at: string | null }) => {
         const roomEntries = reByEvent[e.id] ?? []
         const roomIdSet = new Set(roomEntries.map(r => r.id))
         const roomNames = roomEntries.map(r => r.name)
         if (e.room_id && !roomIdSet.has(e.room_id)) { roomIdSet.add(e.room_id); roomNames.push('(Legacy)') }
-        return { id: e.id, name: e.name, date: e.date, location: e.location, created_at: e.created_at, roomCount: roomIdSet.size, roomNames }
+        return { id: e.id, name: e.name, date: e.date, location: e.location, created_at: e.created_at, roomCount: roomIdSet.size, roomNames, voting_opens_at: e.voting_opens_at, voting_released_at: e.voting_released_at }
       })
     )
     setLoading(false)
@@ -267,7 +270,7 @@ function EventsTab() {
 
           {expandedId === event.id && (
             <div className="border-t border-white/5 px-4 py-3 flex flex-col gap-2">
-              {!releasedIds.has(event.id) && (
+              {isVotingLocked(event) && !releasedIds.has(event.id) && (
                 <button onClick={() => releaseVoting(event.id)}
                   className="w-full card border-secondary/20 rounded-lg py-2 font-bebas text-secondary tracking-[1px] text-sm active:scale-95 transition-transform">
                   🔓 Voting jetzt freigeben

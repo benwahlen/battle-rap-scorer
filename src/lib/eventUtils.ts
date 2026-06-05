@@ -11,6 +11,12 @@ export function canVote(event: VotingState): boolean {
   return new Date(event.voting_opens_at) <= new Date()
 }
 
+// Returns true only when there is an active lock that can be manually released.
+// Lock icon and "Voting freigeben" button must be hidden when voting_opens_at is null.
+export function isVotingLocked(event: VotingState): boolean {
+  return !!event.voting_opens_at && !event.voting_released_at && new Date(event.voting_opens_at) > new Date()
+}
+
 export function formatVotingDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('de-DE', {
     day: '2-digit', month: '2-digit', year: 'numeric',

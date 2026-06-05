@@ -149,14 +149,12 @@ export default function RoomDetail() {
               + Event
             </button>
           )}
-          {isRoomAdmin && !isSuperAdmin && (
-            <button
-              onClick={() => navigate(`/event-pool/${roomId}`)}
-              className="bg-secondary font-bebas text-black text-xs px-3 py-1.5 rounded tracking-[2px] active:scale-95 transition-transform whitespace-nowrap"
-            >
-              + Pool
-            </button>
-          )}
+          <button
+            onClick={() => navigate(`/event-pool/${roomId}`)}
+            className="bg-secondary font-bebas text-black text-xs px-3 py-1.5 rounded tracking-[2px] active:scale-95 transition-transform whitespace-nowrap"
+          >
+            + Pool
+          </button>
         </div>
       </div>
 

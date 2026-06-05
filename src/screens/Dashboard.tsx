@@ -103,14 +103,8 @@ export default function Dashboard() {
   async function loadGlobalEvents() {
     setEventsLoading(true)
     try {
-      const { data: adminProfiles } = await supabase
-        .from('profiles').select('id').eq('role', 'super_admin')
-      const adminIds = (adminProfiles ?? []).map((p: { id: string }) => p.id)
-
-      const { data: evData } = adminIds.length > 0
-        ? await supabase.from('events').select('id, name, date')
-            .in('created_by', adminIds).order('created_at', { ascending: false })
-        : { data: [] }
+      const { data: evData } = await supabase
+        .from('events').select('id, name, date').order('created_at', { ascending: false })
       const ids = (evData ?? []).map((e: { id: string }) => e.id)
       const { data: battleData } = ids.length > 0
         ? await supabase.from('battles').select('event_id').in('event_id', ids)
