@@ -2,7 +2,6 @@ import { useRef, useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth, useIsSuperAdmin } from '../context/AuthContext'
-import type { EventMode } from '../types'
 
 interface BattleInput {
   mc1: string
@@ -115,32 +114,14 @@ export default function NewEvent() {
     })
   }
 
-  const [mode, setMode] = useState<EventMode>('heads_up')
   const [votingOpensAt, setVotingOpensAt] = useState('')
-  const [expertUserId, setExpertUserId] = useState('')
-  const [roomMembers, setRoomMembers] = useState<{ id: string; display_name: string }[]>([])
-
-  useEffect(() => {
-    if (mode !== 'expert' || !roomId) return
-    supabase
-      .from('room_members').select('user_id, profiles(id, display_name)').eq('room_id', roomId)
-      .then(({ data }) => {
-        type Row = { profiles: { id: string; display_name: string } | { id: string; display_name: string }[] | null }
-        setRoomMembers(
-          (data ?? []).map((row: Row) => {
-            const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
-            return p ? { id: p.id, display_name: p.display_name } : null
-          }).filter(Boolean) as { id: string; display_name: string }[]
-        )
-      })
-  }, [mode, roomId])
 
   const resetForm = () => {
     setName(''); setDate(''); setLocation('')
     setBattles([{ mc1: '', mc2: '', format: '1v1' }])
     setError(null); setPublishError(null); setDebugInfo(null); setSuccessInfo(null)
     setPublishAll(true); setSelectedRoomIds(new Set())
-    setMode('heads_up'); setVotingOpensAt(''); setExpertUserId('')
+    setVotingOpensAt('')
     setImagePreview(null); setScanStatus('idle'); setScanError(null)
   }
 
@@ -214,8 +195,6 @@ export default function NewEvent() {
           date: date.trim() || null,
           location: location.trim() || null,
           room_id: roomId ?? null,
-          mode,
-          expert_user_id: mode === 'expert' ? expertUserId || null : null,
           voting_opens_at: votingOpensAt ? new Date(votingOpensAt).toISOString() : null,
         })
         .select()
@@ -395,39 +374,6 @@ export default function NewEvent() {
           <input type="text" placeholder="Event-Name *" value={name} onChange={e => setName(e.target.value)} className={inputCls} />
           <input type="text" placeholder="Datum (z.B. 15.06.2025)" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
           <input type="text" placeholder="Ort (optional)" value={location} onChange={e => setLocation(e.target.value)} className={inputCls} />
-        </div>
-
-        {/* Bewertungs-Modus */}
-        <div className="flex flex-col gap-3">
-          <label className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted">Bewertungs-Modus</label>
-          <div className="flex gap-2">
-            {([
-              { value: 'heads_up' as EventMode, label: 'Heads Up', sub: '1v1 Duell' },
-              { value: 'community' as EventMode, label: 'Community', sub: 'Alle vs. Schnitt' },
-              { value: 'expert' as EventMode, label: 'Expert', sub: '1 vs. Alle' },
-            ]).map(m => (
-              <button key={m.value} onClick={() => setMode(m.value)}
-                className={`flex-1 py-2.5 px-1 rounded-lg text-center transition-colors active:scale-95 ${mode === m.value ? 'bg-primary text-white' : 'bg-white/10 text-app-muted'}`}>
-                <p className="font-bebas text-sm tracking-[1px] leading-tight">{m.label}</p>
-                <p className="font-inter text-[9px] opacity-70 leading-tight mt-0.5">{m.sub}</p>
-              </button>
-            ))}
-          </div>
-          {mode === 'heads_up' && <p className="font-inter text-[10px] text-app-muted/60">Ideal für 1v1 Bewertungs-Duelle</p>}
-          {mode === 'community' && <p className="font-inter text-[10px] text-app-muted/60">Für Gruppen mit 3+ Personen · Reveal sofort nach eigener Bewertung</p>}
-          {mode === 'expert' && (
-            <div className="flex flex-col gap-2">
-              <p className="font-inter text-[10px] text-app-muted/60">Streamer vs. Community, Judge vs. Publikum</p>
-              {roomId ? (
-                <select value={expertUserId} onChange={e => setExpertUserId(e.target.value)} className={inputCls}>
-                  <option value="">Expert auswählen…</option>
-                  {roomMembers.map(m => <option key={m.id} value={m.id}>{m.display_name}</option>)}
-                </select>
-              ) : (
-                <p className="font-inter text-[10px] text-accent/80">Expert-Modus nur in Gruppenkontext verfügbar</p>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Voting Freigabe */}

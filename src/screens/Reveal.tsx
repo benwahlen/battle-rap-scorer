@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import type { Battle, Score, BattleVerdict, EventMode } from '../types'
+import type { Battle, Score, BattleVerdict, EventMode, RoomMode } from '../types'
 import { CATEGORIES } from '../types'
+import { getRoomMode } from '../lib/eventUtils'
 
 // ── Farben ────────────────────────────────────────────────────────────────────
 const C_BEN   = '#A855F7'
@@ -317,16 +318,19 @@ export default function Reveal() {
   useEffect(() => {
     async function load() {
       try {
-        const [{ data: event }, { data: battles }] = await Promise.all([
-          supabase.from('events').select('name, mode, expert_user_id').eq('id', eventId).single(),
+        const [{ data: event }, { data: battles }, { data: room }, { data: members }] = await Promise.all([
+          supabase.from('events').select('name').eq('id', eventId).single(),
           supabase.from('battles').select('*').eq('event_id', eventId).order('position'),
+          roomId ? supabase.from('rooms').select('mode, expert_user_id').eq('id', roomId).single() : Promise.resolve({ data: null, error: null }),
+          roomId ? supabase.from('room_members').select('id').eq('room_id', roomId) : Promise.resolve({ data: [], error: null }),
         ])
         setEventName(event?.name ?? '')
-        const mode: EventMode = (event?.mode as EventMode) ?? 'heads_up'
+        const roomMode: RoomMode = (room?.mode as RoomMode) ?? 'auto'
+        const mode = getRoomMode(roomMode, members?.length ?? 2)
         setEventMode(mode)
 
-        if (mode === 'expert' && event?.expert_user_id) {
-          const { data: ep } = await supabase.from('profiles').select('display_name').eq('id', event.expert_user_id).single()
+        if (mode === 'expert' && room?.expert_user_id) {
+          const { data: ep } = await supabase.from('profiles').select('display_name').eq('id', room.expert_user_id).single()
           setExpertUserName(ep?.display_name ?? '')
         }
 

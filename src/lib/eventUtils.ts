@@ -1,3 +1,5 @@
+import type { RoomMode, EventMode } from '../types'
+
 export interface VotingState {
   voting_opens_at: string | null
   voting_released_at: string | null
@@ -14,4 +16,10 @@ export function formatVotingDate(dateStr: string): string {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
+}
+
+/** Bestimmt den effektiven Bewertungsmodus zur Laufzeit aus Raum-Modus + Mitgliederzahl. */
+export function getRoomMode(roomMode: RoomMode, memberCount: number): EventMode {
+  if (roomMode === 'expert') return 'expert'
+  return memberCount >= 3 ? 'community' : 'heads_up'
 }

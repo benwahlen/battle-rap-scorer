@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import type { Battle, CategoryKey, EventMode } from '../types'
+import type { Battle, CategoryKey, EventMode, RoomMode } from '../types'
 import { CATEGORIES } from '../types'
 import Slider from '../components/Slider'
-import { canVote, formatVotingDate } from '../lib/eventUtils'
+import { canVote, formatVotingDate, getRoomMode } from '../lib/eventUtils'
 
 // ── Local score types ────────────────────────────────────────────────────────
 
@@ -96,14 +96,17 @@ export default function BattleOverview() {
 
   async function load() {
     try {
-      const [{ data: event }, { data: battlesData }] = await Promise.all([
-        supabase.from('events').select('name, mode, voting_opens_at, voting_released_at').eq('id', eventId).single(),
+      const [{ data: event }, { data: battlesData }, { data: room }, { data: members }] = await Promise.all([
+        supabase.from('events').select('name, voting_opens_at, voting_released_at').eq('id', eventId).single(),
         supabase.from('battles').select('*').eq('event_id', eventId).order('position'),
+        roomId ? supabase.from('rooms').select('mode, expert_user_id').eq('id', roomId).single() : Promise.resolve({ data: null, error: null }),
+        roomId ? supabase.from('room_members').select('id').eq('room_id', roomId) : Promise.resolve({ data: [], error: null }),
       ])
       setEventName(event?.name ?? '')
-      setEventMode((event?.mode as EventMode) ?? 'heads_up')
       setVotingOpensAt(event?.voting_opens_at ?? null)
       setVotingReleasedAt(event?.voting_released_at ?? null)
+      const roomMode: RoomMode = (room?.mode as RoomMode) ?? 'auto'
+      setEventMode(getRoomMode(roomMode, members?.length ?? 2))
       const list: Battle[] = battlesData ?? []
       setBattles(list)
       const ids = list.map(b => b.id)

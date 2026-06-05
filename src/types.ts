@@ -1,6 +1,7 @@
 export type UserRole = 'member' | 'group_admin' | 'super_admin'
 export type RoomMemberRole = 'member' | 'admin'
-export type EventMode = 'heads_up' | 'community' | 'expert'
+export type RoomMode = 'auto' | 'expert'
+export type EventMode = 'heads_up' | 'community' | 'expert'  // computed at runtime from RoomMode + member count
 
 export interface Room {
   id: string
@@ -8,6 +9,8 @@ export interface Room {
   invite_code: string
   created_by: string | null
   created_at: string
+  mode: RoomMode
+  expert_user_id: string | null
 }
 
 export interface RoomMember {
@@ -33,8 +36,6 @@ export interface Event {
   location: string | null
   room_id: string | null
   created_at: string
-  mode: EventMode
-  expert_user_id: string | null
   voting_opens_at: string | null
   voting_released_at: string | null
 }
