@@ -63,8 +63,10 @@ export interface Score {
   delivery_mc2: number
   struktur_mc1: number
   struktur_mc2: number
-  crowd_mc1: number
-  crowd_mc2: number
+  humor_mc1: number
+  humor_mc2: number
+  innovation_mc1: number
+  innovation_mc2: number
   round_winner: string | null
   round_comment: string | null
   double_down_category: string | null
@@ -85,7 +87,8 @@ export const CATEGORIES = [
   { key: 'personalisierung', label: 'PERSONALISIERUNG' },
   { key: 'delivery', label: 'DELIVERY / PERFORMANCE' },
   { key: 'struktur', label: 'STRUKTUR / DRAMATURGIE' },
-  { key: 'crowd', label: 'CROWD REACTION' },
+  { key: 'humor', label: 'HUMOR' },
+  { key: 'innovation', label: 'INNOVATION' },
 ] as const
 
 export type CategoryKey = typeof CATEGORIES[number]['key']

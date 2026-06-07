@@ -133,6 +133,36 @@ function ScoreBox({ name, color, mc1, mc2, val1, val2, col1, col2 }: ScoreBoxPro
   )
 }
 
+// ── CommentSlider ─────────────────────────────────────────────────────────────
+interface CommentCard { name: string; color: string; comment: string }
+function CommentSlider({ cards }: { cards: CommentCard[] }) {
+  if (!cards.length) return null
+  return (
+    <div className="overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'] }}>
+      <div className="flex gap-2" style={{ width: 'max-content' }}>
+        {cards.map(({ name, color, comment }) => (
+          <div key={name} className="rounded-lg px-3 py-2.5 flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.04)', width: '200px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                style={{ background: `${color}30`, color }}>
+                {name.charAt(0).toUpperCase()}
+              </div>
+              <span style={{ color: '#888', fontSize: '9px', fontFamily: 'Inter, sans-serif',
+                textTransform: 'uppercase', letterSpacing: '0.08em' }} className="truncate">
+                {name}
+              </span>
+            </div>
+            <p style={{ color: '#C8C4E0', fontSize: '11px', fontFamily: 'Inter, sans-serif', lineHeight: 1.4 }}>
+              {comment}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Battle-Anzeige (wiederverwendet für alle Modi) ────────────────────────────
 interface BattleViewProps {
   reveal: BattleReveal
@@ -143,16 +173,25 @@ interface BattleViewProps {
   communityMode?: boolean
   allUserNames?: string[]
   allScores?: Record<string, Score[]>
+  allVerdicts?: Record<string, BattleVerdict>
 }
 
 function BattleView({
   reveal, user0, user1, color0, color1,
   expandedRounds, onToggle,
-  communityMode = false, allUserNames, allScores,
+  communityMode = false, allUserNames, allScores, allVerdicts,
 }: BattleViewProps) {
   const { battle, scores, verdicts } = reveal
   const hasTwo = !!user0 && !!user1 && !!verdicts[user0] && !!verdicts[user1]
   const overallAgree = hasTwo && verdicts[user0].overall_winner === verdicts[user1].overall_winner
+
+  // Source for comments (all real users, not community aggregate)
+  const commentUserNames = (allUserNames ?? reveal.userNames).filter(n => n !== 'Community Ø')
+  const commentScores = allScores ?? reveal.scores
+  const commentVerdicts = allVerdicts ?? reveal.verdicts
+
+  const getNameColor = (name: string) =>
+    name === user0 ? color0 : name === user1 ? color1 : '#888'
 
   return (
     <div className="flex flex-col gap-3">
@@ -201,13 +240,15 @@ function BattleView({
           const avg0mc2 = roundAvgForMC([s0], 'mc2')
           const avg1mc1 = roundAvgForMC([s1], 'mc1')
           const avg1mc2 = roundAvgForMC([s1], 'mc2')
-          const avgMc1 = (avg0mc1 + avg1mc1) / (s0 && s1 ? 2 : 1)
-          const avgMc2 = (avg0mc2 + avg1mc2) / (s0 && s1 ? 2 : 1)
-          const mc1Leads = avgMc1 > avgMc2
 
           const w1Label = communityMode && allUserNames && allScores
             ? `${winnerLabel(w1, battle.mc1, battle.mc2)} (${communityMajorityPct(allUserNames, allScores, round, user0, w1 as 'mc1' | 'mc2' | 'draw')}%)`
             : winnerLabel(w1, battle.mc1, battle.mc2)
+
+          // Round comment cards
+          const roundCommentCards: CommentCard[] = commentUserNames
+            .map(name => ({ name, color: getNameColor(name), comment: commentScores[name]?.[round - 1]?.round_comment ?? '' }))
+            .filter(c => !!c.comment)
 
           return (
             <div key={round} className="card rounded-xl overflow-hidden">
@@ -229,14 +270,29 @@ function BattleView({
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <AgreeBadge agree={roundAgree} />
-                    <span style={{ color: '#555', fontSize: '11px' }}>{isExpanded ? '▲' : '▾'}</span>
+                    {/* Fix 3: bigger, lighter chevron */}
+                    <span style={{ color: '#8888AA', fontSize: '16px', lineHeight: 1 }}>{isExpanded ? '▲' : '▾'}</span>
                   </div>
                 </div>
-                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '10px', marginTop: '6px' }}>
-                  <span style={{ color: mc1Leads ? C_BEN : '#555' }}>Ø {battle.mc1}: {avgMc1.toFixed(1)}</span>
-                  <span style={{ color: '#444' }}> · </span>
-                  <span style={{ color: !mc1Leads ? C_BEN : '#555' }}>Ø {battle.mc2}: {avgMc2.toFixed(1)}</span>
-                </p>
+                {/* Fix 5: show both user0 avg AND user1 avg separately */}
+                <div className="flex flex-col gap-0.5 mt-1.5">
+                  {s0 && (
+                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '10px' }}>
+                      <span style={{ color: color0, fontSize: '9px', fontWeight: 700 }}>{user0}: </span>
+                      <span style={{ color: avg0mc1 >= avg0mc2 ? color0 : '#555' }}>Ø {battle.mc1} {avg0mc1.toFixed(1)}</span>
+                      <span style={{ color: '#444' }}> · </span>
+                      <span style={{ color: avg0mc2 > avg0mc1 ? color0 : '#555' }}>Ø {battle.mc2} {avg0mc2.toFixed(1)}</span>
+                    </p>
+                  )}
+                  {s1 && (
+                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '10px' }}>
+                      <span style={{ color: color1, fontSize: '9px', fontWeight: 700 }}>{user1}: </span>
+                      <span style={{ color: avg1mc1 >= avg1mc2 ? color1 : '#555' }}>Ø {battle.mc1} {avg1mc1.toFixed(1)}</span>
+                      <span style={{ color: '#444' }}> · </span>
+                      <span style={{ color: avg1mc2 > avg1mc1 ? color1 : '#555' }}>Ø {battle.mc2} {avg1mc2.toFixed(1)}</span>
+                    </p>
+                  )}
+                </div>
               </button>
 
               {isExpanded && (
@@ -267,6 +323,15 @@ function BattleView({
                       </div>
                     )
                   })}
+
+                  {/* Fix 4: round comment slider */}
+                  {roundCommentCards.length > 0 && (
+                    <div className="flex flex-col gap-1.5 pt-1 border-t border-white/5 mt-1">
+                      <p style={{ color: '#666', fontSize: '9px', fontFamily: 'Inter, sans-serif',
+                        textTransform: 'uppercase', letterSpacing: '0.12em' }}>Kommentare</p>
+                      <CommentSlider cards={roundCommentCards} />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -274,24 +339,20 @@ function BattleView({
         })}
       </div>
 
-      {/* Battle-Fazit */}
-      {[user0, user1].some(n => verdicts[n]?.battle_comment) && (
-        <div className="flex flex-col gap-2">
-          <p style={{ color: '#666', fontSize: '10px', fontFamily: 'Inter, sans-serif',
-            textTransform: 'uppercase', letterSpacing: '0.15em' }}>Battle-Fazit</p>
-          {[{ name: user0, color: color0 }, { name: user1, color: color1 }].map(({ name, color }) => {
-            const comment = verdicts[name]?.battle_comment
-            if (!comment) return null
-            return (
-              <div key={name} className="card rounded-lg px-4 py-3">
-                <p style={{ color, fontSize: '9px', fontWeight: 700, fontFamily: 'Inter, sans-serif',
-                  textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{name}</p>
-                <p className="font-inter text-app-muted text-sm">{comment}</p>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {/* Fix 4: battle Fazit als comment slider */}
+      {(() => {
+        const battleCommentCards: CommentCard[] = commentUserNames
+          .map(name => ({ name, color: getNameColor(name), comment: commentVerdicts[name]?.battle_comment ?? '' }))
+          .filter(c => !!c.comment)
+        if (!battleCommentCards.length) return null
+        return (
+          <div className="flex flex-col gap-2">
+            <p style={{ color: '#666', fontSize: '10px', fontFamily: 'Inter, sans-serif',
+              textTransform: 'uppercase', letterSpacing: '0.15em' }}>Battle-Fazit</p>
+            <CommentSlider cards={battleCommentCards} />
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -308,8 +369,11 @@ export default function Reveal() {
   const [expertUserName, setExpertUserName] = useState('')
   const [reveals, setReveals] = useState<BattleReveal[]>([])
   const [loading, setLoading] = useState(true)
+  // Fix 3: start all collapsed
   const [expandedRounds, setExpandedRounds] = useState<Set<string>>(new Set())
   const [expertTab, setExpertTab] = useState<'me' | 'community'>('me')
+  // Fix 6: gate for community mode
+  const [userHasVoted, setUserHasVoted] = useState(true)
 
   const toggleRound = (key: string) => setExpandedRounds(prev => {
     const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s
@@ -342,6 +406,10 @@ export default function Reveal() {
           supabase.from('battle_verdicts').select('*').in('battle_id', ids),
         ])
 
+        // Fix 6: check if current user has submitted all battles
+        const myVerdictCount = (allVerdicts ?? []).filter((v: BattleVerdict) => v.user_name === displayName).length
+        setUserHasVoted(ids.length === 0 || myVerdictCount === ids.length)
+
         const revealData: BattleReveal[] = (battles ?? []).map((battle: Battle) => {
           const bScores: Score[] = (allScores ?? []).filter((s: Score) => s.battle_id === battle.id)
           const bVerdicts: BattleVerdict[] = (allVerdicts ?? []).filter((v: BattleVerdict) => v.battle_id === battle.id)
@@ -358,7 +426,7 @@ export default function Reveal() {
         })
 
         setReveals(revealData)
-        setExpandedRounds(new Set(revealData.map(r => `${r.battle.id}_1`)))
+        // Fix 3: leave expandedRounds empty (all collapsed)
       } catch { /* silent */ }
       finally { setLoading(false) }
     }
@@ -370,6 +438,36 @@ export default function Reveal() {
       <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">Lade Reveal…</p>
     </div>
   )
+
+  // Fix 6: community mode gate — must have voted to see reveal
+  if (eventMode === 'community' && !userHasVoted) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 flex items-center gap-3 z-10 noise-header">
+          <button onClick={() => navigate(roomId ? `/room/${roomId}` : '/')} className="text-app-muted text-xl w-8 flex-shrink-0">←</button>
+          <div className="flex-1 min-w-0">
+            <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">Reveal</p>
+            <h1 className="font-bebas text-xl text-app-text tracking-wider truncate">{eventName}</h1>
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-6">
+          <div className="text-5xl">🔒</div>
+          <div>
+            <h2 className="font-bebas text-2xl text-app-text tracking-wider mb-2">Noch nicht bewertet</h2>
+            <p className="font-inter text-app-muted text-sm leading-relaxed">
+              Du musst zuerst alle Battles bewerten,<br />bevor du den Community-Reveal sehen kannst.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate(`/room/${roomId}/score/${eventId}`)}
+            className="bg-primary font-bebas text-white py-3 px-8 rounded-lg tracking-[2px] text-base active:scale-95 transition-transform shadow-lg shadow-primary/30"
+          >
+            Jetzt bewerten →
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen">
@@ -436,7 +534,8 @@ export default function Reveal() {
                 return (
                   <BattleView reveal={reveal} user0={u0} user1={u1}
                     color0={C_BEN} color1={C_OTHER}
-                    expandedRounds={expandedRounds} onToggle={toggleRound} />
+                    expandedRounds={expandedRounds} onToggle={toggleRound}
+                    allVerdicts={reveal.verdicts} />
                 )
               })()}
 
@@ -452,7 +551,8 @@ export default function Reveal() {
                   <BattleView reveal={comReveal} user0={displayName} user1="Community Ø"
                     color0={C_BEN} color1={C_OTHER}
                     expandedRounds={expandedRounds} onToggle={toggleRound}
-                    communityMode allUserNames={userNames} allScores={reveal.scores} />
+                    communityMode allUserNames={userNames} allScores={reveal.scores}
+                    allVerdicts={reveal.verdicts} />
                 )
               })()}
 
@@ -468,7 +568,8 @@ export default function Reveal() {
                   return (
                     <BattleView reveal={expertReveal} user0={u0} user1={u1}
                       color0={C_BEN} color1={C_OTHER}
-                      expandedRounds={expandedRounds} onToggle={toggleRound} />
+                      expandedRounds={expandedRounds} onToggle={toggleRound}
+                      allVerdicts={reveal.verdicts} />
                   )
                 } else {
                   // Community vs. Expert
@@ -485,7 +586,8 @@ export default function Reveal() {
                     <BattleView reveal={expertReveal} user0="Community Ø" user1={expertUserName}
                       color0={C_OTHER} color1={C_BEN}
                       expandedRounds={expandedRounds} onToggle={toggleRound}
-                      communityMode allUserNames={userNames} allScores={reveal.scores} />
+                      communityMode allUserNames={userNames} allScores={reveal.scores}
+                      allVerdicts={reveal.verdicts} />
                   )
                 }
               })()}

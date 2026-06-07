@@ -17,7 +17,8 @@ interface RoundScore {
   personalisierung_mc1: number; personalisierung_mc2: number
   delivery_mc1: number; delivery_mc2: number
   struktur_mc1: number; struktur_mc2: number
-  crowd_mc1: number; crowd_mc2: number
+  humor_mc1: number; humor_mc2: number
+  innovation_mc1: number; innovation_mc2: number
   round_winner: RoundWinner | null
   round_comment: string
   double_down_category: CategoryKey | null
@@ -34,7 +35,8 @@ const defaultRound = (): RoundScore => ({
   personalisierung_mc1: 3, personalisierung_mc2: 3,
   delivery_mc1: 3, delivery_mc2: 3,
   struktur_mc1: 3, struktur_mc2: 3,
-  crowd_mc1: 3, crowd_mc2: 3,
+  humor_mc1: 3, humor_mc2: 3,
+  innovation_mc1: 3, innovation_mc2: 3,
   round_winner: null, round_comment: '', double_down_category: null,
 })
 
@@ -145,7 +147,8 @@ export default function BattleOverview() {
               personalisierung_mc1: s.personalisierung_mc1, personalisierung_mc2: s.personalisierung_mc2,
               delivery_mc1: s.delivery_mc1, delivery_mc2: s.delivery_mc2,
               struktur_mc1: s.struktur_mc1, struktur_mc2: s.struktur_mc2,
-              crowd_mc1: s.crowd_mc1, crowd_mc2: s.crowd_mc2,
+              humor_mc1: s.humor_mc1 ?? 3, humor_mc2: s.humor_mc2 ?? 3,
+              innovation_mc1: s.innovation_mc1 ?? 3, innovation_mc2: s.innovation_mc2 ?? 3,
               round_winner: (s.round_winner as RoundWinner) ?? null,
               round_comment: s.round_comment ?? '',
               double_down_category: (s.double_down_category as CategoryKey) ?? null,
@@ -184,7 +187,8 @@ export default function BattleOverview() {
             personalisierung_mc1: rs.personalisierung_mc1, personalisierung_mc2: rs.personalisierung_mc2,
             delivery_mc1: rs.delivery_mc1, delivery_mc2: rs.delivery_mc2,
             struktur_mc1: rs.struktur_mc1, struktur_mc2: rs.struktur_mc2,
-            crowd_mc1: rs.crowd_mc1, crowd_mc2: rs.crowd_mc2,
+            humor_mc1: rs.humor_mc1, humor_mc2: rs.humor_mc2,
+            innovation_mc1: rs.innovation_mc1, innovation_mc2: rs.innovation_mc2,
             round_winner: rs.round_winner, round_comment: rs.round_comment || null,
             double_down_category: rs.double_down_category || null,
           }, { onConflict: 'battle_id,user_name,round_number' })
@@ -488,6 +492,7 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
                   placeholder="Kommentar zur Runde (optional)"
                   value={rs.round_comment}
                   onChange={e => setRoundComment(round, e.target.value)}
+                  onFocus={e => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
                   rows={2}
                   className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-app-text placeholder-app-muted/50 focus:outline-none focus:border-primary/50 font-inter text-sm resize-none"
                 />
@@ -541,6 +546,7 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
               placeholder="Gesamteindruck, Highlights, Diskussionspunkte…"
               value={score.battle_comment}
               onChange={e => setBattleComment(e.target.value)}
+              onFocus={e => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
               rows={3}
               className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-app-text placeholder-app-muted/50 focus:outline-none focus:border-primary/50 font-inter text-sm resize-none"
             />

@@ -28,6 +28,7 @@ export default function Slider({ value, onChange, mc, isLeading = false }: Props
         step={1}
         value={value}
         onChange={e => onChange(Number(e.target.value))}
+        onTouchStart={() => (document.activeElement as HTMLElement)?.blur()}
         className="brs-slider w-full"
         style={{ background: trackBg }}
       />

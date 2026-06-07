@@ -12,7 +12,8 @@ interface RoundScore {
   personalisierung_mc1: number; personalisierung_mc2: number
   delivery_mc1: number; delivery_mc2: number
   struktur_mc1: number; struktur_mc2: number
-  crowd_mc1: number; crowd_mc2: number
+  humor_mc1: number; humor_mc2: number
+  innovation_mc1: number; innovation_mc2: number
   round_winner: RoundWinner | null
 }
 
@@ -26,7 +27,8 @@ const defaultRound = (): RoundScore => ({
   personalisierung_mc1: 5, personalisierung_mc2: 5,
   delivery_mc1: 5, delivery_mc2: 5,
   struktur_mc1: 5, struktur_mc2: 5,
-  crowd_mc1: 5, crowd_mc2: 5,
+  humor_mc1: 5, humor_mc2: 5,
+  innovation_mc1: 5, innovation_mc2: 5,
   round_winner: null,
 })
 
@@ -145,7 +147,8 @@ export default function ScoreScreen({ user, eventId, onBack, onSubmitted }: Prop
               personalisierung_mc1: rs.personalisierung_mc1, personalisierung_mc2: rs.personalisierung_mc2,
               delivery_mc1: rs.delivery_mc1, delivery_mc2: rs.delivery_mc2,
               struktur_mc1: rs.struktur_mc1, struktur_mc2: rs.struktur_mc2,
-              crowd_mc1: rs.crowd_mc1, crowd_mc2: rs.crowd_mc2,
+              humor_mc1: rs.humor_mc1, humor_mc2: rs.humor_mc2,
+              innovation_mc1: rs.innovation_mc1, innovation_mc2: rs.innovation_mc2,
               round_winner: rs.round_winner,
             },
             { onConflict: 'battle_id,user_name,round_number' }

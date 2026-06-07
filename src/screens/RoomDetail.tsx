@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth, useIsSuperAdmin, useIsGroupAdmin } from '../context/AuthContext'
-import type { Event, Room } from '../types'
+import type { Event, Room, RoomMode } from '../types'
+import { getRoomMode } from '../lib/eventUtils'
 import Avatar from '../components/Avatar'
 
 type EventStatus = 'unrated' | 'waiting' | 'reveal'
@@ -47,9 +48,11 @@ export default function RoomDetail() {
         supabase.from('room_members').select('user_id').eq('room_id', roomId),
       ])
       setRoom(roomData as Room)
+      const roomMode: RoomMode = (roomData as Room)?.mode ?? 'auto'
 
       // Get member profiles
       const memberUserIds = (memberships ?? []).map((m: { user_id: string }) => m.user_id)
+      const memberCount = memberUserIds.length
       const { data: profiles } = await supabase
         .from('profiles').select('id, display_name, avatar_index').in('id', memberUserIds)
       setMembers(
@@ -94,7 +97,14 @@ export default function RoomDetail() {
           const otherDone = otherNames.some(name =>
             allVerdicts.filter((v: { user_name: string }) => v.user_name === name).length === battleCount
           )
-          const status: EventStatus = myDone && otherDone ? 'reveal' : myDone ? 'waiting' : 'unrated'
+          // Fix 6: in community mode, reveal is accessible as soon as the user has voted
+          const effectiveMode = getRoomMode(roomMode, memberCount)
+          let status: EventStatus
+          if (effectiveMode === 'community') {
+            status = myDone ? 'reveal' : 'unrated'
+          } else {
+            status = myDone && otherDone ? 'reveal' : myDone ? 'waiting' : 'unrated'
+          }
           return { ...event, battleCount, status }
         })
       )
