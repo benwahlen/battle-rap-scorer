@@ -21,6 +21,8 @@ interface BattleReveal {
   verdicts: Record<string, BattleVerdict>
 }
 
+interface StatRow { label: string; color: string; mc1Val: number; mc2Val: number }
+
 const winnerLabel = (w: string | null, mc1: string, mc2: string) =>
   w === 'mc1' ? mc1 : w === 'mc2' ? mc2 : w === 'draw' ? 'Draw' : '–'
 
@@ -29,12 +31,23 @@ const CAT_STYLE: React.CSSProperties = {
   fontFamily: 'Inter, sans-serif', textTransform: 'uppercase', letterSpacing: '0.08em',
 }
 
+// ── Avg-Helpers ───────────────────────────────────────────────────────────────
 function roundAvgForMC(roundScores: (Score | undefined)[], mc: 'mc1' | 'mc2') {
   const valid = roundScores.filter(Boolean) as Score[]
   if (!valid.length) return 0
   return valid.reduce((s, rs) =>
     s + CATEGORIES.reduce((cs, cat) => cs + ((rs[`${cat.key}_${mc}` as keyof Score] as number) || 0), 0), 0
   ) / (valid.length * CATEGORIES.length)
+}
+
+// Mean of per-round averages across the given users.
+function multiUserBattleAvg(
+  names: string[], scoreMap: Record<string, Score[]>, mc: 'mc1' | 'mc2'
+): number {
+  const allRoundScores = names.flatMap(n => scoreMap[n] ?? [])
+  if (!allRoundScores.length) return 0
+  const vals = allRoundScores.map(s => roundAvgForMC([s], mc))
+  return vals.reduce((a, b) => a + b, 0) / vals.length
 }
 
 // ── Community-Daten berechnen ─────────────────────────────────────────────────
@@ -163,7 +176,7 @@ function CommentSlider({ cards }: { cards: CommentCard[] }) {
   )
 }
 
-// ── Battle-Anzeige (wiederverwendet für alle Modi) ────────────────────────────
+// ── Battle-Anzeige ────────────────────────────────────────────────────────────
 interface BattleViewProps {
   reveal: BattleReveal
   user0: string; user1: string
@@ -185,13 +198,31 @@ function BattleView({
   const hasTwo = !!user0 && !!user1 && !!verdicts[user0] && !!verdicts[user1]
   const overallAgree = hasTwo && verdicts[user0].overall_winner === verdicts[user1].overall_winner
 
-  // Source for comments (all real users, not community aggregate)
+  // Source data for comments and stats (real users, no aggregate)
   const commentUserNames = (allUserNames ?? reveal.userNames).filter(n => n !== 'Community Ø')
   const commentScores = allScores ?? reveal.scores
   const commentVerdicts = allVerdicts ?? reveal.verdicts
 
   const getNameColor = (name: string) =>
     name === user0 ? color0 : name === user1 ? color1 : '#888'
+
+  // ── Fix 2: GESAMTBEWERTUNG statistics ─────────────────────────────────────
+  const statsNames = (allUserNames ?? reveal.userNames).filter(n => n !== 'Community Ø')
+  const statsScores = allScores ?? scores
+
+  const statRows: StatRow[] = [
+    { label: user0, color: color0,
+      mc1Val: multiUserBattleAvg([user0], scores, 'mc1'),
+      mc2Val: multiUserBattleAvg([user0], scores, 'mc2') },
+    ...(user1 ? [{ label: user1, color: color1,
+      mc1Val: multiUserBattleAvg([user1], scores, 'mc1'),
+      mc2Val: multiUserBattleAvg([user1], scores, 'mc2') }] : []),
+  ]
+  const gesamtMc1 = multiUserBattleAvg(statsNames, statsScores, 'mc1')
+  const gesamtMc2 = multiUserBattleAvg(statsNames, statsScores, 'mc2')
+
+  const fmtVal = (v: number) => v > 0 ? v.toFixed(1) : '–'
+  const colW = '52px'
 
   return (
     <div className="flex flex-col gap-3">
@@ -221,6 +252,46 @@ function BattleView({
           <div className="flex justify-center mt-3"><AgreeBadge agree={overallAgree} /></div>
         </div>
       )}
+
+      {/* Fix 2: GESAMTBEWERTUNG card */}
+      <div className="card rounded-xl p-4">
+        <p style={{ color: C_CAT, fontSize: '10px', fontWeight: 700, fontFamily: 'Inter, sans-serif',
+          textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '10px' }}>
+          Gesamtbewertung
+        </p>
+        {/* Header row */}
+        <div style={{ display: 'grid', gridTemplateColumns: `1fr ${colW} ${colW}`, gap: '4px', marginBottom: '2px' }}>
+          <div />
+          <p style={{ color: '#555', fontSize: '9px', fontFamily: 'Inter, sans-serif', textAlign: 'center',
+            textTransform: 'uppercase', letterSpacing: '0.06em' }} className="truncate">{battle.mc1}</p>
+          <p style={{ color: '#555', fontSize: '9px', fontFamily: 'Inter, sans-serif', textAlign: 'center',
+            textTransform: 'uppercase', letterSpacing: '0.06em' }} className="truncate">{battle.mc2}</p>
+        </div>
+        {statRows.map(({ label, color, mc1Val, mc2Val }) => (
+          <div key={label} style={{ display: 'grid', gridTemplateColumns: `1fr ${colW} ${colW}`, gap: '4px',
+            alignItems: 'center', padding: '3px 0' }}>
+            <p style={{ color, fontSize: '10px', fontWeight: 700, fontFamily: 'Inter, sans-serif',
+              textTransform: 'uppercase', letterSpacing: '0.06em' }} className="truncate">{label}</p>
+            <p className="font-bebas" style={{ color, fontSize: '20px', textAlign: 'center', lineHeight: 1.2 }}>
+              {fmtVal(mc1Val)}
+            </p>
+            <p className="font-bebas" style={{ color, fontSize: '20px', textAlign: 'center', lineHeight: 1.2 }}>
+              {fmtVal(mc2Val)}
+            </p>
+          </div>
+        ))}
+        <div className="border-t border-white/8 my-2" />
+        <div style={{ display: 'grid', gridTemplateColumns: `1fr ${colW} ${colW}`, gap: '4px', alignItems: 'center' }}>
+          <p style={{ color: '#F1F0FF', fontSize: '10px', fontWeight: 700, fontFamily: 'Inter, sans-serif',
+            textTransform: 'uppercase', letterSpacing: '0.06em' }}>Gesamt Ø</p>
+          <p className="font-bebas" style={{ color: '#F1F0FF', fontSize: '20px', textAlign: 'center', lineHeight: 1.2 }}>
+            {fmtVal(gesamtMc1)}
+          </p>
+          <p className="font-bebas" style={{ color: '#F1F0FF', fontSize: '20px', textAlign: 'center', lineHeight: 1.2 }}>
+            {fmtVal(gesamtMc2)}
+          </p>
+        </div>
+      </div>
 
       <p style={{ color: C_CAT, fontSize: '10px', fontWeight: 700, fontFamily: 'Inter, sans-serif',
         textTransform: 'uppercase', letterSpacing: '0.15em' }}>Runden im Detail</p>
@@ -270,11 +341,10 @@ function BattleView({
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <AgreeBadge agree={roundAgree} />
-                    {/* Fix 3: bigger, lighter chevron */}
                     <span style={{ color: '#8888AA', fontSize: '16px', lineHeight: 1 }}>{isExpanded ? '▲' : '▾'}</span>
                   </div>
                 </div>
-                {/* Fix 5: show both user0 avg AND user1 avg separately */}
+                {/* Both user avgs in collapsed header */}
                 <div className="flex flex-col gap-0.5 mt-1.5">
                   {s0 && (
                     <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '10px' }}>
@@ -324,7 +394,7 @@ function BattleView({
                     )
                   })}
 
-                  {/* Fix 4: round comment slider */}
+                  {/* Round comment slider */}
                   {roundCommentCards.length > 0 && (
                     <div className="flex flex-col gap-1.5 pt-1 border-t border-white/5 mt-1">
                       <p style={{ color: '#666', fontSize: '9px', fontFamily: 'Inter, sans-serif',
@@ -339,7 +409,7 @@ function BattleView({
         })}
       </div>
 
-      {/* Fix 4: battle Fazit als comment slider */}
+      {/* Battle-Fazit comment slider */}
       {(() => {
         const battleCommentCards: CommentCard[] = commentUserNames
           .map(name => ({ name, color: getNameColor(name), comment: commentVerdicts[name]?.battle_comment ?? '' }))
@@ -369,10 +439,8 @@ export default function Reveal() {
   const [expertUserName, setExpertUserName] = useState('')
   const [reveals, setReveals] = useState<BattleReveal[]>([])
   const [loading, setLoading] = useState(true)
-  // Fix 3: start all collapsed
   const [expandedRounds, setExpandedRounds] = useState<Set<string>>(new Set())
   const [expertTab, setExpertTab] = useState<'me' | 'community'>('me')
-  // Fix 6: gate for community mode
   const [userHasVoted, setUserHasVoted] = useState(true)
 
   const toggleRound = (key: string) => setExpandedRounds(prev => {
@@ -406,7 +474,6 @@ export default function Reveal() {
           supabase.from('battle_verdicts').select('*').in('battle_id', ids),
         ])
 
-        // Fix 6: check if current user has submitted all battles
         const myVerdictCount = (allVerdicts ?? []).filter((v: BattleVerdict) => v.user_name === displayName).length
         setUserHasVoted(ids.length === 0 || myVerdictCount === ids.length)
 
@@ -426,7 +493,6 @@ export default function Reveal() {
         })
 
         setReveals(revealData)
-        // Fix 3: leave expandedRounds empty (all collapsed)
       } catch { /* silent */ }
       finally { setLoading(false) }
     }
@@ -439,7 +505,7 @@ export default function Reveal() {
     </div>
   )
 
-  // Fix 6: community mode gate — must have voted to see reveal
+  // Community mode gate
   if (eventMode === 'community' && !userHasVoted) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -477,7 +543,6 @@ export default function Reveal() {
           <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">Reveal</p>
           <h1 className="font-bebas text-xl text-app-text tracking-wider truncate">{eventName}</h1>
         </div>
-        {/* Modus-Badge */}
         <span className="font-inter text-[9px] px-2 py-1 rounded uppercase tracking-[0.08em] bg-white/5 text-app-muted flex-shrink-0">
           {eventMode === 'heads_up' ? 'Heads Up' : eventMode === 'community' ? 'Community' : 'Expert'}
         </span>
@@ -499,13 +564,18 @@ export default function Reveal() {
         {reveals.map(reveal => {
           const { battle, userNames } = reveal
 
-          // Community-Daten vorbereiten
           const communityScores = buildCommunityScores(userNames, reveal.scores, displayName)
           const communityVerdict = buildCommunityVerdict(userNames, reveal.verdicts, battle.id, displayName)
           const commScoresMap = { ...reveal.scores, 'Community Ø': communityScores }
           const commVerdictsMap = communityVerdict
             ? { ...reveal.verdicts, 'Community Ø': communityVerdict }
             : reveal.verdicts
+
+          // Fix 1: User-Tags — in community mode show only [me, Community Ø]
+          const tagsToShow: string[] = eventMode === 'community'
+            ? [displayName, 'Community Ø']
+            : userNames
+          const tagColors = [C_BEN, C_OTHER]
 
           return (
             <div key={battle.id} className="flex flex-col gap-4">
@@ -517,18 +587,18 @@ export default function Reveal() {
                   style={{ fontSize: '28px', color: '#F1F0FF' }}>
                   {battle.mc1} vs {battle.mc2}
                 </h2>
-                {/* User-Tags */}
-                <div className="flex gap-2 justify-center mt-2">
-                  {userNames.map((name, idx) => (
+                {/* Fix 1: community mode → only show me + Community Ø */}
+                <div className="flex gap-2 justify-center flex-wrap mt-2">
+                  {tagsToShow.map((name, idx) => (
                     <span key={name} className="font-inter text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-[0.08em]"
-                      style={{ background: `${idx === 0 ? C_BEN : C_OTHER}20`, color: idx === 0 ? C_BEN : C_OTHER }}>
+                      style={{ background: `${tagColors[idx] ?? C_OTHER}20`, color: tagColors[idx] ?? C_OTHER }}>
                       {name}
                     </span>
                   ))}
                 </div>
               </div>
 
-              {/* Heads Up: alle User direkt */}
+              {/* Heads Up */}
               {eventMode === 'heads_up' && (() => {
                 const u0 = userNames[0] ?? ''; const u1 = userNames[1] ?? ''
                 return (
@@ -539,7 +609,7 @@ export default function Reveal() {
                 )
               })()}
 
-              {/* Community Vote: Ich vs. Community Ø */}
+              {/* Community: Ich vs. Community Ø */}
               {eventMode === 'community' && (() => {
                 const comReveal = {
                   ...reveal,
@@ -556,7 +626,7 @@ export default function Reveal() {
                 )
               })()}
 
-              {/* Expert Mode: Tab 1 (Ich vs. Expert) oder Tab 2 (Community vs. Expert) */}
+              {/* Expert Mode */}
               {eventMode === 'expert' && (() => {
                 if (expertTab === 'me') {
                   const expertReveal = {
@@ -572,7 +642,6 @@ export default function Reveal() {
                       allVerdicts={reveal.verdicts} />
                   )
                 } else {
-                  // Community vs. Expert
                   const expertReveal = {
                     ...reveal,
                     userNames: ['Community Ø', expertUserName],
