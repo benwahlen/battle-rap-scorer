@@ -322,12 +322,28 @@ function EventsTab() {
           ? new Date(editForm.voting_opens_at).toISOString()
           : null,
       }).eq('id', editingEvent.id)
-      if (evErr) throw evErr
+      if (evErr) {
+        console.error('[saveEdit] events UPDATE fehlgeschlagen:', evErr.code, evErr.message, evErr.details, evErr.hint)
+        throw evErr
+      }
 
-      // 2. Entfernte Battles löschen (cascade löscht scores + battle_verdicts)
+      // 2. Entfernte Battles löschen — child-Rows zuerst (defensiv, falls CASCADE fehlt)
       for (const id of deletedBattleIds) {
+        const { error: scErr } = await supabase.from('scores').delete().eq('battle_id', id)
+        if (scErr) {
+          console.error('[saveEdit] scores DELETE fehlgeschlagen:', scErr.code, scErr.message, scErr.details, scErr.hint)
+          throw scErr
+        }
+        const { error: bvErr } = await supabase.from('battle_verdicts').delete().eq('battle_id', id)
+        if (bvErr) {
+          console.error('[saveEdit] battle_verdicts DELETE fehlgeschlagen:', bvErr.code, bvErr.message, bvErr.details, bvErr.hint)
+          throw bvErr
+        }
         const { error: delErr } = await supabase.from('battles').delete().eq('id', id)
-        if (delErr) throw delErr
+        if (delErr) {
+          console.error('[saveEdit] battles DELETE fehlgeschlagen:', delErr.code, delErr.message, delErr.details, delErr.hint)
+          throw delErr
+        }
       }
 
       // 3. Bestehende Battles updaten
@@ -337,7 +353,10 @@ function EventsTab() {
           mc2: eb.mc2.trim() || eb.mc2,
           format: eb.format,
         }).eq('id', eb.id!)
-        if (updErr) throw updErr
+        if (updErr) {
+          console.error('[saveEdit] battles UPDATE fehlgeschlagen:', updErr.code, updErr.message, updErr.details, updErr.hint)
+          throw updErr
+        }
       }
 
       // 4. Neue Battles inserieren (nur wenn mc1 oder mc2 ausgefüllt)
@@ -353,7 +372,10 @@ function EventsTab() {
             position: existingCount + i,
           }))
         )
-        if (insErr) throw insErr
+        if (insErr) {
+          console.error('[saveEdit] battles INSERT fehlgeschlagen:', insErr.code, insErr.message, insErr.details, insErr.hint)
+          throw insErr
+        }
       }
 
       setEvents(prev => prev.map(e => e.id === editingEvent.id ? {
@@ -368,8 +390,11 @@ function EventsTab() {
       // Battles-Cache für dieses Event leeren → nächstes Aufklappen lädt frisch
       setBattlesMap(prev => { const next = { ...prev }; delete next[editingEvent.id]; return next })
       closeModal()
-    } catch {
-      setEditError('Speichern fehlgeschlagen. Bitte erneut versuchen.')
+    } catch (err) {
+      const pgErr = err as { message?: string; code?: string; details?: string; hint?: string } | null
+      const detail = [pgErr?.code, pgErr?.message, pgErr?.details, pgErr?.hint].filter(Boolean).join(' — ')
+      console.error('[saveEdit] Fehler:', err)
+      setEditError(`Fehler: ${detail || 'Unbekannt. Konsole prüfen.'}`)
     }
     setSaving(false)
   }
