@@ -94,6 +94,7 @@ export default function BattleOverview() {
   const [isEditing, setIsEditing] = useState(false)
   const [activeBattleId, setActiveBattleId] = useState<string | null>(null)
   const [otherVerdictStatus, setOtherVerdictStatus] = useState<Record<string, boolean>>({})
+  const [savedBattleIds, setSavedBattleIds] = useState<Set<string>>(new Set())
 
   useEffect(() => { if (eventId) load() }, [eventId, displayName]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -118,30 +119,30 @@ export default function BattleOverview() {
       const ids = list.map(b => b.id)
       if (ids.length === 0) { setLoading(false); return }
 
-      const { data: verdicts } = await supabase
-        .from('battle_verdicts').select('*').in('battle_id', ids).eq('user_name', displayName)
-      const alreadyDone = (verdicts?.length ?? 0) === ids.length
+      const [{ data: verdicts }, { data: existingScores }, { data: allVerdicts }] = await Promise.all([
+        supabase.from('battle_verdicts').select('*').in('battle_id', ids).eq('user_name', displayName),
+        supabase.from('scores').select('*').in('battle_id', ids).eq('user_name', displayName),
+        supabase.from('battle_verdicts').select('battle_id, user_name').in('battle_id', ids),
+      ])
 
-      // Load all verdicts to compute other-user status
-      const { data: allVerdicts } = await supabase
-        .from('battle_verdicts').select('battle_id, user_name').in('battle_id', ids)
+      const verdictSet = new Set((verdicts ?? []).map((v: { battle_id: string }) => v.battle_id))
+      setSavedBattleIds(verdictSet)
+      setIsEditing(verdictSet.size === ids.length)
+
       const otherStatus: Record<string, boolean> = {}
       for (const b of list) {
         otherStatus[b.id] = (allVerdicts ?? []).some(v => v.battle_id === b.id && v.user_name !== displayName)
       }
       setOtherVerdictStatus(otherStatus)
 
-      let init: Record<string, BattleScore> = {}
-
-      if (alreadyDone) {
-        const { data: existingScores } = await supabase
-          .from('scores').select('*').in('battle_id', ids).eq('user_name', displayName)
-        for (const b of list) {
-          const verdict = verdicts!.find(v => v.battle_id === b.id)
-          const bScores = (existingScores ?? []).filter(s => s.battle_id === b.id)
+      const init: Record<string, BattleScore> = {}
+      for (const b of list) {
+        const verdict = (verdicts ?? []).find((v: { battle_id: string }) => v.battle_id === b.id) ?? null
+        const bScores = (existingScores ?? []).filter((s: { battle_id: string }) => s.battle_id === b.id)
+        if (verdict || bScores.length > 0) {
           const rounds: Record<number, RoundScore> = {}
           for (const rn of [1, 2, 3]) {
-            const s = bScores.find(s => s.round_number === rn)
+            const s = bScores.find((s: { round_number: number }) => s.round_number === rn)
             rounds[rn] = s ? {
               bars_mc1: s.bars_mc1, bars_mc2: s.bars_mc2,
               personalisierung_mc1: s.personalisierung_mc1, personalisierung_mc2: s.personalisierung_mc2,
@@ -158,10 +159,9 @@ export default function BattleOverview() {
             rounds, overall_winner: (verdict?.overall_winner as OverallWinner) ?? null,
             battle_comment: verdict?.battle_comment ?? '',
           }
+        } else {
+          init[b.id] = defaultBattleScore()
         }
-        setIsEditing(true)
-      } else {
-        for (const b of list) init[b.id] = defaultBattleScore()
       }
       setScores(init)
     } catch {
@@ -177,30 +177,6 @@ export default function BattleOverview() {
   async function handleSubmit() {
     setSubmitting(true); setError(null)
     try {
-      for (const b of battles) {
-        const bs = scores[b.id]
-        for (const round of [1, 2, 3] as const) {
-          const rs = bs.rounds[round]
-          const { error: e } = await supabase.from('scores').upsert({
-            battle_id: b.id, user_name: displayName, round_number: round,
-            bars_mc1: rs.bars_mc1, bars_mc2: rs.bars_mc2,
-            personalisierung_mc1: rs.personalisierung_mc1, personalisierung_mc2: rs.personalisierung_mc2,
-            delivery_mc1: rs.delivery_mc1, delivery_mc2: rs.delivery_mc2,
-            struktur_mc1: rs.struktur_mc1, struktur_mc2: rs.struktur_mc2,
-            humor_mc1: rs.humor_mc1, humor_mc2: rs.humor_mc2,
-            innovation_mc1: rs.innovation_mc1, innovation_mc2: rs.innovation_mc2,
-            round_winner: rs.round_winner, round_comment: rs.round_comment || null,
-            double_down_category: rs.double_down_category || null,
-          }, { onConflict: 'battle_id,user_name,round_number' })
-          if (e) throw e
-        }
-        const { error: ve } = await supabase.from('battle_verdicts').upsert({
-          battle_id: b.id, user_name: displayName,
-          overall_winner: bs.overall_winner!,
-          battle_comment: bs.battle_comment || null,
-        }, { onConflict: 'battle_id,user_name' })
-        if (ve) throw ve
-      }
       // Modus beim ersten Submit einfrieren (locked_mode noch nicht gesetzt)
       if (!lockedMode && roomId && eventId) {
         await supabase.from('room_events')
@@ -208,7 +184,6 @@ export default function BattleOverview() {
           .eq('room_id', roomId)
           .eq('event_id', eventId)
       }
-
       // Check if any OTHER user has already completed all battles
       const { data: allOtherVerdicts } = await supabase
         .from('battle_verdicts').select('battle_id, user_name')
@@ -241,8 +216,10 @@ export default function BattleOverview() {
         battleIndex={battles.indexOf(battle)}
         battleCount={battles.length}
         score={scores[activeBattleId]}
+        displayName={displayName}
         onChange={s => updateScore(activeBattleId, s)}
         onBack={() => setActiveBattleId(null)}
+        onSaved={id => setSavedBattleIds(prev => new Set([...prev, id]))}
       />
     )
   }
@@ -254,8 +231,8 @@ export default function BattleOverview() {
     </div>
   )
 
-  const allComplete = battles.length > 0 && battles.every(b => scores[b.id] && isBattleComplete(scores[b.id]))
-  const doneCount = battles.filter(b => scores[b.id] && isBattleComplete(scores[b.id])).length
+  const allComplete = battles.length > 0 && savedBattleIds.size === battles.length
+  const doneCount = savedBattleIds.size
 
   return (
     <div className="min-h-screen">
@@ -272,9 +249,9 @@ export default function BattleOverview() {
       <div className="p-4 flex flex-col gap-3 pb-36">
         {battles.map((b, i) => {
           const bs = scores[b.id]
-          const myDone = bs && isBattleComplete(bs)
+          const mySaved = savedBattleIds.has(b.id)
           const otherDone = otherVerdictStatus[b.id] ?? false
-          const statusVariant = myDone && otherDone ? 'reveal' : myDone ? 'waiting' : otherDone ? 'my_turn' : 'pending'
+          const statusVariant = mySaved && otherDone ? 'reveal' : mySaved ? 'saved' : otherDone ? 'my_turn' : 'pending'
           const avg = bs ? battleAvg(bs) : null
           const votingAllowed = canVote({ voting_opens_at: votingOpensAt, voting_released_at: votingReleasedAt })
           return (
@@ -304,7 +281,7 @@ export default function BattleOverview() {
                   ) : (
                     <>
                       {statusVariant === 'reveal' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-secondary/20 text-secondary">🔓 Reveal</span>}
-                      {statusVariant === 'waiting' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-white/10 text-app-muted">⏳ Wartet</span>}
+                      {statusVariant === 'saved' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-green-900/30 text-green-400">✓ Bewertet</span>}
                       {statusVariant === 'my_turn' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-accent/20 text-accent animate-pulse">⚡ Nur noch du</span>}
                       {statusVariant === 'pending' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-primary/20 text-primary">Ausstehend</span>}
                     </>
@@ -348,12 +325,15 @@ interface SingleBattleProps {
   battleIndex: number
   battleCount: number
   score: BattleScore
+  displayName: string
   onChange: (score: BattleScore) => void
   onBack: () => void
+  onSaved: (battleId: string) => void
 }
 
-function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, onBack }: SingleBattleProps) {
+function SingleBattleView({ battle, battleIndex, battleCount, score, displayName, onChange, onBack, onSaved }: SingleBattleProps) {
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const setScoreVal = (round: number, field: keyof Omit<RoundScore, 'round_winner' | 'round_comment' | 'double_down_category'>, value: number) =>
     onChange({ ...score, rounds: { ...score.rounds, [round]: { ...score.rounds[round], [field]: value } } })
@@ -373,7 +353,7 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
   const setBattleComment = (c: string) => onChange({ ...score, battle_comment: c })
   const avg = battleAvg(score)
 
-  const handleSaveAndBack = () => {
+  const handleSaveAndBack = async () => {
     const allRoundsDone = [1, 2, 3].every(r => score.rounds[r]?.round_winner !== null)
     const overallDone = score.overall_winner !== null
     if (!allRoundsDone || !overallDone) {
@@ -381,7 +361,35 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
       return
     }
     setSaveError(null)
-    onBack()
+    setSaving(true)
+    try {
+      for (const round of [1, 2, 3] as const) {
+        const rs = score.rounds[round]
+        const { error: e } = await supabase.from('scores').upsert({
+          battle_id: battle.id, user_name: displayName, round_number: round,
+          bars_mc1: rs.bars_mc1, bars_mc2: rs.bars_mc2,
+          personalisierung_mc1: rs.personalisierung_mc1, personalisierung_mc2: rs.personalisierung_mc2,
+          delivery_mc1: rs.delivery_mc1, delivery_mc2: rs.delivery_mc2,
+          struktur_mc1: rs.struktur_mc1, struktur_mc2: rs.struktur_mc2,
+          humor_mc1: rs.humor_mc1, humor_mc2: rs.humor_mc2,
+          innovation_mc1: rs.innovation_mc1, innovation_mc2: rs.innovation_mc2,
+          round_winner: rs.round_winner, round_comment: rs.round_comment || null,
+          double_down_category: rs.double_down_category || null,
+        }, { onConflict: 'battle_id,user_name,round_number' })
+        if (e) throw e
+      }
+      const { error: ve } = await supabase.from('battle_verdicts').upsert({
+        battle_id: battle.id, user_name: displayName,
+        overall_winner: score.overall_winner!,
+        battle_comment: score.battle_comment || null,
+      }, { onConflict: 'battle_id,user_name' })
+      if (ve) throw ve
+      onSaved(battle.id)
+      onBack()
+    } catch {
+      setSaveError('Fehler beim Speichern. Bitte erneut versuchen.')
+      setSaving(false)
+    }
   }
 
   return (
@@ -556,10 +564,10 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, onChange, o
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-app-bg/90 backdrop-blur border-t border-white/5 flex flex-col gap-2">
         {saveError && <p className="font-inter text-accent text-xs text-center">{saveError}</p>}
-        <button onClick={handleSaveAndBack}
-          className="w-full font-bebas text-white py-4 rounded-lg tracking-[2px] text-base active:scale-95 transition-transform shadow-lg"
+        <button onClick={handleSaveAndBack} disabled={saving}
+          className="w-full font-bebas text-white py-4 rounded-lg tracking-[2px] text-base active:scale-95 transition-transform shadow-lg disabled:opacity-50"
           style={{ background: 'linear-gradient(135deg, #7C3AED, #0EA5E9)' }}>
-          Speichern und zur Übersicht
+          {saving ? 'Wird gespeichert…' : 'Speichern und zur Übersicht'}
         </button>
       </div>
     </div>
