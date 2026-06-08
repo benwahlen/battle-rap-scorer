@@ -67,9 +67,6 @@ function battleAvg(bs: BattleScore) {
   }
 }
 
-function isBattleComplete(bs: BattleScore) {
-  return bs.overall_winner !== null && [1, 2, 3].every(r => bs.rounds[r]?.round_winner !== null)
-}
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -267,7 +264,7 @@ export default function BattleOverview() {
                   <p className="font-bebas text-lg text-app-text tracking-wider truncate leading-tight">
                     {b.mc1} vs {b.mc2}
                   </p>
-                  {myDone && avg && (
+                  {mySaved && avg && (
                     <p className="font-inter text-[10px] text-app-muted mt-1">
                       {b.mc1} Ø {avg.mc1.toFixed(1)} · {b.mc2} Ø {avg.mc2.toFixed(1)}
                     </p>
