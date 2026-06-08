@@ -89,21 +89,26 @@ export default function RoomDetail() {
           const { data: verdicts } = await supabase
             .from('battle_verdicts').select('battle_id, user_name').in('battle_id', battleIds)
           const allVerdicts = verdicts ?? []
-          const myDone = allVerdicts.filter((v: { user_name: string }) => v.user_name === displayName).length === battleCount
-          const otherNames = [...new Set(
-            allVerdicts.filter((v: { user_name: string }) => v.user_name !== displayName)
-              .map((v: { user_name: string }) => v.user_name)
-          )]
-          const otherDone = otherNames.some(name =>
-            allVerdicts.filter((v: { user_name: string }) => v.user_name === name).length === battleCount
+          // Per-battle 3-state logic:
+          // State 1: I haven't voted on this battle
+          // State 2: Only I have voted
+          // State 3: Another user has also voted → reveal
+          const myVotedIds = new Set(
+            allVerdicts
+              .filter((v: { user_name: string }) => v.user_name === displayName)
+              .map((v: { battle_id: string }) => v.battle_id)
           )
-          // Fix 6: in community mode, reveal is accessible as soon as the user has voted
+          const myDone = myVotedIds.size === battleCount
+          const anyBattleShared = allVerdicts.some(
+            (v: { user_name: string; battle_id: string }) =>
+              v.user_name !== displayName && myVotedIds.has(v.battle_id)
+          )
           const effectiveMode = getRoomMode(roomMode, memberCount)
           let status: EventStatus
           if (effectiveMode === 'community') {
             status = myDone ? 'reveal' : 'unrated'
           } else {
-            status = myDone && otherDone ? 'reveal' : myDone ? 'waiting' : 'unrated'
+            status = anyBattleShared ? 'reveal' : myDone ? 'waiting' : 'unrated'
           }
           return { ...event, battleCount, status }
         })

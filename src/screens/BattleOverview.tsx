@@ -184,18 +184,13 @@ export default function BattleOverview() {
           .eq('room_id', roomId)
           .eq('event_id', eventId)
       }
-      // Check if any OTHER user has already completed all battles
+      // Reveal sobald irgendein anderer User mindestens eine Battle bewertet hat
       const { data: allOtherVerdicts } = await supabase
-        .from('battle_verdicts').select('battle_id, user_name')
+        .from('battle_verdicts').select('battle_id')
         .in('battle_id', battles.map(b => b.id))
         .neq('user_name', displayName)
-      const otherNames = [...new Set((allOtherVerdicts ?? []).map((v: { user_name: string }) => v.user_name))]
-      const otherDone = otherNames.some(name =>
-        (allOtherVerdicts ?? []).filter((v: { user_name: string }) => v.user_name === name).length === battles.length
-      )
-      if (eventMode === 'community') {
-        navigate(`/room/${roomId}/reveal/${eventId}`, { replace: true })
-      } else if (otherDone) {
+      const anyShared = (allOtherVerdicts ?? []).length > 0
+      if (eventMode === 'community' || anyShared) {
         navigate(`/room/${roomId}/reveal/${eventId}`, { replace: true })
       } else {
         navigate(`/room/${roomId}/wait/${eventId}`, { replace: true })
@@ -256,7 +251,15 @@ export default function BattleOverview() {
           const votingAllowed = canVote({ voting_opens_at: votingOpensAt, voting_released_at: votingReleasedAt })
           return (
             <button key={b.id}
-              onClick={() => votingAllowed ? setActiveBattleId(b.id) : undefined}
+              onClick={() => {
+                if (!votingAllowed) return
+                // State 3: another user has voted on this battle → go to reveal (frozen)
+                if (mySaved && otherDone) {
+                  navigate(`/room/${roomId}/reveal/${eventId}`)
+                } else {
+                  setActiveBattleId(b.id)
+                }
+              }}
               disabled={!votingAllowed}
               className={`card rounded-lg p-4 text-left transition-transform w-full ${votingAllowed ? 'active:scale-95' : 'opacity-60 cursor-default'}`}>
               <div className="flex items-center justify-between gap-3">
