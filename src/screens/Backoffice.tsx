@@ -48,21 +48,22 @@ export default function Backoffice() {
   if (!isSuperAdmin) return null
 
   return (
-    <div className="min-h-screen">
-      <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 flex items-center gap-3 z-10 noise-header">
+    <div className="min-h-screen" style={{ background: 'linear-gradient(180deg, rgba(80,0,0,0.4) 0%, rgba(20,0,0,0.6) 100%)' }}>
+      <div className="sticky top-0 backdrop-blur border-b border-red-900/30 px-4 py-4 flex items-center gap-3 z-10 noise-header" style={{ background: 'rgba(40,0,0,0.85)' }}>
         <button onClick={() => navigate('/profile')} className="text-app-muted text-xl w-8">←</button>
-        <h1 className="font-bebas text-xl text-app-text tracking-wider">Backoffice</h1>
+        <h1 className="font-bebas text-xl tracking-wider" style={{ color: '#DC2626' }}>Backoffice</h1>
       </div>
 
       {/* Tab Bar */}
-      <div className="flex border-b border-white/5">
+      <div className="flex border-b border-red-900/20">
         {([['users', 'User'], ['events', 'Events'], ['rooms', 'Gruppen']] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
             className={`flex-1 py-3 font-bebas text-sm tracking-[1px] transition-colors ${
-              tab === key ? 'text-primary border-b-2 border-primary' : 'text-app-muted'
+              tab === key ? 'border-b-2 border-[#DC2626]' : 'text-app-muted'
             }`}
+            style={tab === key ? { color: '#DC2626' } : undefined}
           >
             {label}
           </button>
