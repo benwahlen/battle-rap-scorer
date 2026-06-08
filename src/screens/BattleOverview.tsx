@@ -332,6 +332,8 @@ interface SingleBattleProps {
 }
 
 function SingleBattleView({ battle, battleIndex, battleCount, score, displayName, onChange, onBack, onSaved }: SingleBattleProps) {
+  const [currentRound, setCurrentRound] = useState(1)
+  const [animDir, setAnimDir] = useState<'forward' | 'back'>('forward')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -351,7 +353,22 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, displayName
 
   const setOverallWinner = (w: OverallWinner) => onChange({ ...score, overall_winner: w })
   const setBattleComment = (c: string) => onChange({ ...score, battle_comment: c })
-  const avg = battleAvg(score)
+
+  const goNext = () => {
+    if (!score.rounds[currentRound]?.round_winner) {
+      setSaveError('Bitte einen Rundensieger wählen.')
+      return
+    }
+    setSaveError(null)
+    setAnimDir('forward')
+    setCurrentRound(r => r + 1)
+  }
+
+  const goPrev = () => {
+    setSaveError(null)
+    setAnimDir('back')
+    setCurrentRound(r => r - 1)
+  }
 
   const handleSaveAndBack = async () => {
     const allRoundsDone = [1, 2, 3].every(r => score.rounds[r]?.round_winner !== null)
@@ -392,13 +409,25 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, displayName
     }
   }
 
+  const rs = score.rounds[currentRound]
+  const rAvg = roundAvg(rs)
+  const mc1Leading = rAvg.mc1 >= rAvg.mc2
+  const avg = battleAvg(score)
+  const isLastRound = currentRound === 3
+
   return (
     <div className="min-h-screen">
-      <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-4 z-10 noise-header">
+      <style>{`
+        @keyframes slideFromRight { from { transform: translateX(48px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideFromLeft  { from { transform: translateX(-48px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+      `}</style>
+
+      {/* Header */}
+      <div className="sticky top-0 bg-app-bg/90 backdrop-blur border-b border-white/5 px-4 py-3 z-10 noise-header">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="text-app-muted text-xl w-8 flex-shrink-0">←</button>
           <div className="flex-1 min-w-0">
-            <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em]">
+            <p className="font-inter text-app-muted text-[10px] uppercase tracking-[0.15em] truncate">
               Battle {battleIndex + 1}/{battleCount} · {battle.format}
             </p>
             <h1 className="font-bebas text-lg text-app-text tracking-wider truncate leading-tight">
@@ -406,169 +435,158 @@ function SingleBattleView({ battle, battleIndex, battleCount, score, displayName
             </h1>
           </div>
         </div>
+        {/* Round progress indicator */}
+        <div className="flex items-center gap-3 mt-2">
+          <p className="font-bebas text-sm tracking-[2px] text-primary flex-shrink-0">RUNDE {currentRound} / 3</p>
+          <div className="flex gap-1.5 flex-1">
+            {[1, 2, 3].map(r => (
+              <div key={r} className="h-1 rounded-full transition-all duration-300"
+                style={{
+                  flex: r === currentRound ? 1.5 : 1,
+                  background: r < currentRound ? 'rgba(124,58,237,0.5)' : r === currentRound ? '#7C3AED' : 'rgba(255,255,255,0.1)',
+                }} />
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div className="p-4 pb-24 flex flex-col gap-4">
-        {[1, 2, 3].map(round => {
-          const rs = score.rounds[round]
-          const rAvg = roundAvg(rs)
-          const mc1Leading = rAvg.mc1 >= rAvg.mc2
-
-          return (
-            <div key={round} className="card rounded-lg overflow-hidden">
-              {/* Round header */}
-              <div className="px-4 py-3 bg-white/5 border-b border-white/5 flex items-center justify-between">
-                <span className="font-bebas text-lg text-primary tracking-widest">Runde {round}</span>
-              </div>
-
-              {/* Categories */}
-              <div className="px-3 pt-3 pb-2 flex flex-col gap-3">
-                {CATEGORIES.map(cat => {
-                  const mc1Key = `${cat.key}_mc1` as keyof Omit<RoundScore, 'round_winner' | 'round_comment' | 'double_down_category'>
-                  const mc2Key = `${cat.key}_mc2` as keyof Omit<RoundScore, 'round_winner' | 'round_comment' | 'double_down_category'>
-                  const isDoubled = rs.double_down_category === cat.key
-
-                  return (
-                    <div key={cat.key} className={`rounded-lg p-2 ${isDoubled ? 'double-down-active' : ''}`}>
-                      {/* Label + 2x Button */}
-                      <div className="flex items-center justify-center gap-2 mb-2">
-                        <span className="font-inter font-bold uppercase" style={{ color: '#C0B8E8', fontSize: '11px', letterSpacing: '0.12em' }}>{cat.label}</span>
-                        <button onClick={() => toggleDoubleDown(round, cat.key)}
-                          className={`font-bebas text-xs px-2 py-0.5 rounded tracking-wider transition-colors ${
-                            isDoubled ? 'bg-primary text-white shadow-sm shadow-primary/50' : 'bg-white/10 text-app-muted'
-                          }`}>
-                          2×
-                        </button>
-                      </div>
-                      {/* Zwei Slider nebeneinander */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <Slider
-                          mc={battle.mc1}
-                          value={rs[mc1Key] as number}
-                          onChange={v => setScoreVal(round, mc1Key, v)}
-                          isLeading={(rs[mc1Key] as number) > (rs[mc2Key] as number)}
-                        />
-                        <Slider
-                          mc={battle.mc2}
-                          value={rs[mc2Key] as number}
-                          onChange={v => setScoreVal(round, mc2Key, v)}
-                          isLeading={(rs[mc2Key] as number) > (rs[mc1Key] as number)}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Live average banner */}
-              <div className="mx-3 mb-3 card rounded-lg px-4 py-3 flex items-center justify-between">
-                <div className="text-center">
-                  <div className={`font-bebas text-[40px] leading-none ${mc1Leading ? 'text-primary' : 'text-app-muted'}`}>
-                    {rAvg.mc1.toFixed(1)}
+      {/* Paged round content — keyed on currentRound triggers slide animation */}
+      <div
+        key={currentRound}
+        className="p-4 pb-28 flex flex-col gap-4"
+        style={{ animation: `${animDir === 'forward' ? 'slideFromRight' : 'slideFromLeft'} 0.22s ease-out` }}
+      >
+        <div className="card rounded-lg overflow-hidden">
+          {/* Categories */}
+          <div className="px-3 pt-3 pb-2 flex flex-col gap-3">
+            {CATEGORIES.map(cat => {
+              const mc1Key = `${cat.key}_mc1` as keyof Omit<RoundScore, 'round_winner' | 'round_comment' | 'double_down_category'>
+              const mc2Key = `${cat.key}_mc2` as keyof Omit<RoundScore, 'round_winner' | 'round_comment' | 'double_down_category'>
+              const isDoubled = rs.double_down_category === cat.key
+              return (
+                <div key={cat.key} className={`rounded-lg p-2 ${isDoubled ? 'double-down-active' : ''}`}>
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <span className="font-inter font-bold uppercase" style={{ color: '#C0B8E8', fontSize: '11px', letterSpacing: '0.12em' }}>{cat.label}</span>
+                    <button onClick={() => toggleDoubleDown(currentRound, cat.key)}
+                      className={`font-bebas text-xs px-2 py-0.5 rounded tracking-wider transition-colors ${
+                        isDoubled ? 'bg-primary text-white shadow-sm shadow-primary/50' : 'bg-white/10 text-app-muted'
+                      }`}>2×</button>
                   </div>
-                  <p className="font-inter text-[9px] uppercase tracking-wider text-app-muted">{battle.mc1}</p>
-                </div>
-                <span className="font-inter text-[10px] text-app-muted uppercase tracking-widest">Ø</span>
-                <div className="text-center">
-                  <div className={`font-bebas text-[40px] leading-none ${!mc1Leading ? 'text-primary' : 'text-app-muted'}`}>
-                    {rAvg.mc2.toFixed(1)}
+                  <div className="grid grid-cols-2 gap-3">
+                    <Slider mc={battle.mc1} value={rs[mc1Key] as number} onChange={v => setScoreVal(currentRound, mc1Key, v)} isLeading={(rs[mc1Key] as number) > (rs[mc2Key] as number)} />
+                    <Slider mc={battle.mc2} value={rs[mc2Key] as number} onChange={v => setScoreVal(currentRound, mc2Key, v)} isLeading={(rs[mc2Key] as number) > (rs[mc1Key] as number)} />
                   </div>
-                  <p className="font-inter text-[9px] uppercase tracking-wider text-app-muted">{battle.mc2}</p>
                 </div>
-              </div>
+              )
+            })}
+          </div>
 
-              {/* Round winner */}
-              <div className="px-3 pb-3 border-t border-white/5 pt-3">
-                <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted mb-2 text-center">Rundensieger</p>
-                <div className="flex gap-2">
-                  {(['mc1', 'draw', 'mc2'] as RoundWinner[]).map(w => (
-                    <button key={w} onClick={() => setRoundWinner(round, w)}
-                      className={`flex-1 py-2.5 rounded font-bebas tracking-[2px] text-sm transition-colors truncate px-1 ${
-                        rs.round_winner === w
-                          ? 'bg-primary text-white shadow-sm shadow-primary/40'
-                          : 'bg-white/10 text-app-muted'
-                      }`}>
-                      {w === 'mc1' ? battle.mc1 : w === 'mc2' ? battle.mc2 : 'Draw'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Round comment */}
-              <div className="px-3 pb-3">
-                <textarea
-                  placeholder="Kommentar zur Runde (optional)"
-                  value={rs.round_comment}
-                  onChange={e => setRoundComment(round, e.target.value)}
-                  onFocus={e => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
-                  rows={2}
-                  className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-app-text placeholder-app-muted/50 focus:outline-none focus:border-primary/50 font-inter text-sm resize-none"
-                />
-              </div>
-            </div>
-          )
-        })}
-
-        {/* Battle avg + Overall winner */}
-        <div className="card rounded-lg p-4 flex flex-col gap-4">
-          {/* Battle total average */}
-          <div className="flex items-center justify-between">
-            <div className="text-center flex-1">
-              <div className={`font-bebas text-[40px] leading-none ${avg.mc1 >= avg.mc2 ? 'text-primary' : 'text-app-muted'}`}>
-                {avg.mc1.toFixed(1)}
-              </div>
+          {/* Live avg banner */}
+          <div className="mx-3 mb-3 card rounded-lg px-4 py-3 flex items-center justify-between">
+            <div className="text-center">
+              <div className={`font-bebas text-[40px] leading-none ${mc1Leading ? 'text-primary' : 'text-app-muted'}`}>{rAvg.mc1.toFixed(1)}</div>
               <p className="font-inter text-[9px] uppercase tracking-wider text-app-muted">{battle.mc1}</p>
             </div>
-            <div className="text-center px-3">
-              <p className="font-inter text-[10px] text-app-muted uppercase tracking-widest">Battle Ø</p>
-            </div>
-            <div className="text-center flex-1">
-              <div className={`font-bebas text-[40px] leading-none ${avg.mc2 > avg.mc1 ? 'text-primary' : 'text-app-muted'}`}>
-                {avg.mc2.toFixed(1)}
-              </div>
+            <span className="font-inter text-[10px] text-app-muted uppercase tracking-widest">Ø</span>
+            <div className="text-center">
+              <div className={`font-bebas text-[40px] leading-none ${!mc1Leading ? 'text-primary' : 'text-app-muted'}`}>{rAvg.mc2.toFixed(1)}</div>
               <p className="font-inter text-[9px] uppercase tracking-wider text-app-muted">{battle.mc2}</p>
             </div>
           </div>
 
-          {/* Overall winner */}
-          <div>
-            <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted mb-2 text-center">Gesamtsieger</p>
+          {/* Rundensieger */}
+          <div className="px-3 pb-3 border-t border-white/5 pt-3">
+            <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted mb-2 text-center">Rundensieger</p>
             <div className="flex gap-2">
-              {(['mc1', 'mc2'] as OverallWinner[]).map(w => (
-                <button key={w} onClick={() => setOverallWinner(w)}
-                  className={`flex-1 py-3 rounded font-bebas tracking-[2px] text-sm transition-colors truncate ${
-                    score.overall_winner === w
-                      ? 'bg-primary text-white shadow-md shadow-primary/40'
-                      : 'bg-white/10 text-app-muted'
+              {(['mc1', 'draw', 'mc2'] as RoundWinner[]).map(w => (
+                <button key={w} onClick={() => setRoundWinner(currentRound, w)}
+                  className={`flex-1 py-2.5 rounded font-bebas tracking-[2px] text-sm transition-colors truncate px-1 ${
+                    rs.round_winner === w ? 'bg-primary text-white shadow-sm shadow-primary/40' : 'bg-white/10 text-app-muted'
                   }`}>
-                  {w === 'mc1' ? battle.mc1 : battle.mc2}
+                  {w === 'mc1' ? battle.mc1 : w === 'mc2' ? battle.mc2 : 'Draw'}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Battle comment */}
-          <div>
-            <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted mb-2">Battle-Fazit (optional)</p>
+          {/* Round comment */}
+          <div className="px-3 pb-3">
             <textarea
-              placeholder="Gesamteindruck, Highlights, Diskussionspunkte…"
-              value={score.battle_comment}
-              onChange={e => setBattleComment(e.target.value)}
+              placeholder="Kommentar zur Runde (optional)"
+              value={rs.round_comment}
+              onChange={e => setRoundComment(currentRound, e.target.value)}
               onFocus={e => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
-              rows={3}
+              rows={2}
               className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-app-text placeholder-app-muted/50 focus:outline-none focus:border-primary/50 font-inter text-sm resize-none"
             />
           </div>
         </div>
+
+        {/* Gesamtsieger + Battle avg + Battle comment — only on round 3 */}
+        {isLastRound && (
+          <div className="card rounded-lg p-4 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="text-center flex-1">
+                <div className={`font-bebas text-[40px] leading-none ${avg.mc1 >= avg.mc2 ? 'text-primary' : 'text-app-muted'}`}>{avg.mc1.toFixed(1)}</div>
+                <p className="font-inter text-[9px] uppercase tracking-wider text-app-muted">{battle.mc1}</p>
+              </div>
+              <p className="font-inter text-[10px] text-app-muted uppercase tracking-widest px-3">Battle Ø</p>
+              <div className="text-center flex-1">
+                <div className={`font-bebas text-[40px] leading-none ${avg.mc2 > avg.mc1 ? 'text-primary' : 'text-app-muted'}`}>{avg.mc2.toFixed(1)}</div>
+                <p className="font-inter text-[9px] uppercase tracking-wider text-app-muted">{battle.mc2}</p>
+              </div>
+            </div>
+            <div>
+              <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted mb-2 text-center">Gesamtsieger</p>
+              <div className="flex gap-2">
+                {(['mc1', 'mc2'] as OverallWinner[]).map(w => (
+                  <button key={w} onClick={() => setOverallWinner(w)}
+                    className={`flex-1 py-3 rounded font-bebas tracking-[2px] text-sm transition-colors truncate ${
+                      score.overall_winner === w ? 'bg-primary text-white shadow-md shadow-primary/40' : 'bg-white/10 text-app-muted'
+                    }`}>
+                    {w === 'mc1' ? battle.mc1 : battle.mc2}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="font-inter text-[10px] uppercase tracking-[0.1em] text-app-muted mb-2">Battle-Fazit (optional)</p>
+              <textarea
+                placeholder="Gesamteindruck, Highlights, Diskussionspunkte…"
+                value={score.battle_comment}
+                onChange={e => setBattleComment(e.target.value)}
+                onFocus={e => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
+                rows={3}
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-app-text placeholder-app-muted/50 focus:outline-none focus:border-primary/50 font-inter text-sm resize-none"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Bottom navigation */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-app-bg/90 backdrop-blur border-t border-white/5 flex flex-col gap-2">
         {saveError && <p className="font-inter text-accent text-xs text-center">{saveError}</p>}
-        <button onClick={handleSaveAndBack} disabled={saving}
-          className="w-full font-bebas text-white py-4 rounded-lg tracking-[2px] text-base active:scale-95 transition-transform shadow-lg disabled:opacity-50"
-          style={{ background: 'linear-gradient(135deg, #7C3AED, #0EA5E9)' }}>
-          {saving ? 'Wird gespeichert…' : 'Speichern und zur Übersicht'}
-        </button>
+        <div className="flex gap-2">
+          {currentRound > 1 && (
+            <button onClick={goPrev}
+              className="flex-1 card rounded-lg py-4 font-bebas text-app-muted tracking-[2px] text-base active:scale-95 transition-transform">
+              ← Zurück
+            </button>
+          )}
+          {!isLastRound ? (
+            <button onClick={goNext}
+              className="flex-1 bg-primary font-bebas text-white py-4 rounded-lg tracking-[2px] text-base active:scale-95 transition-transform shadow-lg shadow-primary/30">
+              Weiter →
+            </button>
+          ) : (
+            <button onClick={handleSaveAndBack} disabled={saving}
+              className="flex-1 font-bebas text-white py-4 rounded-lg tracking-[2px] text-base active:scale-95 transition-transform shadow-lg disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg, #7C3AED, #0EA5E9)' }}>
+              {saving ? 'Wird gespeichert…' : 'Speichern und zur Übersicht'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
