@@ -200,6 +200,7 @@ function EventsTab() {
   const [editBattlesLoading, setEditBattlesLoading] = useState(false)
   const [deletedBattleIds, setDeletedBattleIds] = useState<string[]>([])
   const [editError, setEditError] = useState<string | null>(null)
+  const [testLog, setTestLog] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -259,6 +260,7 @@ function EventsTab() {
     setEditBattles([])
     setDeletedBattleIds([])
     setEditError(null)
+    setTestLog([])
   }
 
   const openEdit = async (event: EventRow) => {
@@ -294,6 +296,34 @@ function EventsTab() {
     ...prev,
     { id: null, mc1: '', mc2: '', format: '1v1', hasScores: false, position: prev.length },
   ])
+
+  const handleTestDelete = async () => {
+    const target = editBattles.find(b => b.id !== null)
+    if (!target || !target.id) {
+      setTestLog(['Kein Battle mit echter ID gefunden.'])
+      return
+    }
+    const id = target.id
+    setTestLog([`Test-Battle: ${target.mc1} vs ${target.mc2} (${id})`])
+
+    const { error: scErr } = await supabase.from('scores').delete().eq('battle_id', id)
+    setTestLog(prev => [...prev, scErr
+      ? `scores delete: FEHLER: ${scErr.code} — ${scErr.message}`
+      : 'scores delete: OK'
+    ])
+
+    const { error: bvErr } = await supabase.from('battle_verdicts').delete().eq('battle_id', id)
+    setTestLog(prev => [...prev, bvErr
+      ? `battle_verdicts delete: FEHLER: ${bvErr.code} — ${bvErr.message}`
+      : 'battle_verdicts delete: OK'
+    ])
+
+    const { error: delErr } = await supabase.from('battles').delete().eq('id', id)
+    setTestLog(prev => [...prev, delErr
+      ? `battles delete: FEHLER: ${delErr.code} — ${delErr.message}`
+      : 'battles delete: OK'
+    ])
+  }
 
   const deleteBattle = (battleId: string | null, idx: number, hasScores: boolean) => {
     if (battleId === null) {
@@ -605,6 +635,28 @@ function EventsTab() {
                 </>
               )}
             </div>
+
+            {editBattles.some(b => b.id !== null) && (
+              <div className="flex flex-col gap-2 border-t border-white/10 pt-3">
+                <button
+                  onClick={handleTestDelete}
+                  className="w-full card border-yellow-800/40 rounded-lg py-2 font-bebas text-yellow-400 tracking-[1px] text-sm active:scale-95 transition-transform"
+                >
+                  🧪 Test Delete (erste Battle)
+                </button>
+                {testLog.length > 0 && (
+                  <div className="flex flex-col gap-0.5">
+                    {testLog.map((line, i) => (
+                      <p key={i} className={`font-mono text-[11px] px-2 py-1 rounded ${
+                        line.includes('FEHLER') ? 'text-red-400 bg-red-900/20' :
+                        line.startsWith('Test-Battle') ? 'text-app-muted bg-white/5' :
+                        'text-green-400 bg-green-900/10'
+                      }`}>{line}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {editError && (
               <p className="font-inter text-red-400 text-xs">{editError}</p>
