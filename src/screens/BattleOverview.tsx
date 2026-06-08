@@ -122,7 +122,10 @@ export default function BattleOverview() {
         supabase.from('battle_verdicts').select('battle_id, user_name').in('battle_id', ids),
       ])
 
-      const verdictSet = new Set((verdicts ?? []).map((v: { battle_id: string }) => v.battle_id))
+      const verdictSet = new Set([
+        ...(verdicts ?? []).map((v: { battle_id: string }) => v.battle_id),
+        ...(existingScores ?? []).map((s: { battle_id: string }) => s.battle_id),
+      ])
       setSavedBattleIds(verdictSet)
       setIsEditing(verdictSet.size === ids.length)
 
