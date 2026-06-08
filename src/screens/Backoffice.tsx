@@ -175,6 +175,15 @@ interface EditForm {
   voting_opens_at: string
 }
 
+interface EditBattle {
+  id: string | null      // null = neu, wird bei Speichern inserted
+  mc1: string
+  mc2: string
+  format: string
+  hasScores: boolean
+  position: number
+}
+
 function EventsTab() {
   const navigate = useNavigate()
   const [events, setEvents] = useState<EventRow[]>([])
@@ -187,6 +196,10 @@ function EventsTab() {
   const [editForm, setEditForm] = useState<EditForm>({ name: '', date: '', location: '', voting_opens_at: '' })
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editBattles, setEditBattles] = useState<EditBattle[]>([])
+  const [editBattlesLoading, setEditBattlesLoading] = useState(false)
+  const [deletedBattleIds, setDeletedBattleIds] = useState<string[]>([])
+  const [editError, setEditError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -241,7 +254,14 @@ function EventsTab() {
     if (!err) setReleasedIds(prev => new Set([...prev, eventId]))
   }
 
-  const openEdit = (event: EventRow) => {
+  const closeModal = () => {
+    setEditingEvent(null)
+    setEditBattles([])
+    setDeletedBattleIds([])
+    setEditError(null)
+  }
+
+  const openEdit = async (event: EventRow) => {
     setEditForm({
       name: event.name,
       date: event.date ?? '',
@@ -250,23 +270,92 @@ function EventsTab() {
         ? new Date(event.voting_opens_at).toISOString().slice(0, 16)
         : '',
     })
+    setEditBattles([])
+    setDeletedBattleIds([])
+    setEditError(null)
     setEditingEvent(event)
+    setEditBattlesLoading(true)
+    const { data: battlesData } = await supabase
+      .from('battles').select('*').eq('event_id', event.id).order('position')
+    const battles = (battlesData ?? []) as Battle[]
+    if (battles.length > 0) {
+      const { data: scoresData } = await supabase
+        .from('scores').select('battle_id').in('battle_id', battles.map(b => b.id))
+      const withScores = new Set((scoresData ?? []).map((s: { battle_id: string }) => s.battle_id))
+      setEditBattles(battles.map(b => ({
+        id: b.id, mc1: b.mc1, mc2: b.mc2, format: b.format,
+        hasScores: withScores.has(b.id), position: b.position,
+      })))
+    }
+    setEditBattlesLoading(false)
+  }
+
+  const addBattle = () => setEditBattles(prev => [
+    ...prev,
+    { id: null, mc1: '', mc2: '', format: '1v1', hasScores: false, position: prev.length },
+  ])
+
+  const deleteBattle = (battleId: string | null, idx: number, hasScores: boolean) => {
+    if (battleId === null) {
+      setEditBattles(prev => prev.filter((_, i) => i !== idx))
+      return
+    }
+    const msg = hasScores
+      ? '⚠️ Dieses Battle hat bereits Bewertungen. Löschen entfernt alle Scores unwiderruflich. Trotzdem löschen?'
+      : 'Battle und alle zugehörigen Bewertungen löschen?'
+    if (!confirm(msg)) return
+    setEditBattles(prev => prev.filter((_, i) => i !== idx))
+    setDeletedBattleIds(prev => [...prev, battleId])
   }
 
   const saveEdit = async () => {
     if (!editingEvent || !editForm.name.trim()) return
     setSaving(true)
-    const { error: err } = await supabase.from('events')
-      .update({
+    setEditError(null)
+    try {
+      // 1. Event-Felder updaten
+      const { error: evErr } = await supabase.from('events').update({
         name: editForm.name.trim(),
         date: editForm.date.trim() || null,
         location: editForm.location.trim() || null,
         voting_opens_at: editForm.voting_opens_at
           ? new Date(editForm.voting_opens_at).toISOString()
           : null,
-      })
-      .eq('id', editingEvent.id)
-    if (!err) {
+      }).eq('id', editingEvent.id)
+      if (evErr) throw evErr
+
+      // 2. Entfernte Battles löschen (cascade löscht scores + battle_verdicts)
+      for (const id of deletedBattleIds) {
+        const { error: delErr } = await supabase.from('battles').delete().eq('id', id)
+        if (delErr) throw delErr
+      }
+
+      // 3. Bestehende Battles updaten
+      for (const eb of editBattles.filter(b => b.id !== null)) {
+        const { error: updErr } = await supabase.from('battles').update({
+          mc1: eb.mc1.trim() || eb.mc1,
+          mc2: eb.mc2.trim() || eb.mc2,
+          format: eb.format,
+        }).eq('id', eb.id!)
+        if (updErr) throw updErr
+      }
+
+      // 4. Neue Battles inserieren (nur wenn mc1 oder mc2 ausgefüllt)
+      const newBattles = editBattles.filter(b => b.id === null && (b.mc1.trim() || b.mc2.trim()))
+      if (newBattles.length > 0) {
+        const existingCount = editBattles.filter(b => b.id !== null).length
+        const { error: insErr } = await supabase.from('battles').insert(
+          newBattles.map((eb, i) => ({
+            event_id: editingEvent.id,
+            mc1: eb.mc1.trim() || 'MC1',
+            mc2: eb.mc2.trim() || 'MC2',
+            format: eb.format,
+            position: existingCount + i,
+          }))
+        )
+        if (insErr) throw insErr
+      }
+
       setEvents(prev => prev.map(e => e.id === editingEvent.id ? {
         ...e,
         name: editForm.name.trim(),
@@ -276,7 +365,11 @@ function EventsTab() {
           ? new Date(editForm.voting_opens_at).toISOString()
           : null,
       } : e))
-      setEditingEvent(null)
+      // Battles-Cache für dieses Event leeren → nächstes Aufklappen lädt frisch
+      setBattlesMap(prev => { const next = { ...prev }; delete next[editingEvent.id]; return next })
+      closeModal()
+    } catch {
+      setEditError('Speichern fehlgeschlagen. Bitte erneut versuchen.')
     }
     setSaving(false)
   }
@@ -383,12 +476,13 @@ function EventsTab() {
 
       {/* Edit Modal */}
       {editingEvent && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={() => setEditingEvent(null)}>
-          <div className="w-full bg-app-bg border-t border-white/10 rounded-t-2xl p-4 pb-8 flex flex-col gap-3"
+        <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={closeModal}>
+          <div className="w-full max-h-[88vh] overflow-y-auto bg-app-bg border-t border-white/10 rounded-t-2xl p-4 pb-10 flex flex-col gap-3"
             onClick={e => e.stopPropagation()}>
-            <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-1" />
-            <p className="font-bebas text-lg text-app-text tracking-wider">Event bearbeiten</p>
+            <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-1 flex-shrink-0" />
+            <p className="font-bebas text-lg text-app-text tracking-wider flex-shrink-0">Event bearbeiten</p>
 
+            {/* Event-Felder */}
             <div className="flex flex-col gap-2">
               <label className="font-inter text-[10px] text-app-muted uppercase tracking-[0.1em]">Name *</label>
               <input
@@ -426,8 +520,73 @@ function EventsTab() {
               />
             </div>
 
+            {/* Battles-Abschnitt */}
+            <div className="flex flex-col gap-2 border-t border-white/10 pt-3 mt-1">
+              <p className="font-inter text-[10px] text-app-muted uppercase tracking-[0.1em]">Battles</p>
+
+              {editBattlesLoading ? (
+                <div className="flex justify-center py-3">
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
+                <>
+                  {editBattles.length === 0 && (
+                    <p className="font-inter text-app-muted/50 text-xs text-center py-1">Noch keine Battles</p>
+                  )}
+                  {editBattles.map((eb, idx) => (
+                    <div key={eb.id ?? `new-${idx}`} className="card rounded-lg p-2.5 flex flex-col gap-1.5">
+                      {eb.hasScores && (
+                        <p className="font-inter text-[10px] text-yellow-400/80">
+                          ⚠️ Hat bereits Bewertungen. Löschen entfernt alle Scores.
+                        </p>
+                      )}
+                      <div className="flex gap-1.5 items-center">
+                        <input
+                          value={eb.mc1}
+                          onChange={e => setEditBattles(prev => prev.map((b, i) => i === idx ? { ...b, mc1: e.target.value } : b))}
+                          placeholder="MC1"
+                          className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1.5 text-app-text font-inter text-sm focus:outline-none focus:border-primary/50 min-w-0"
+                        />
+                        <span className="font-inter text-app-muted/50 text-[10px] flex-shrink-0">vs</span>
+                        <input
+                          value={eb.mc2}
+                          onChange={e => setEditBattles(prev => prev.map((b, i) => i === idx ? { ...b, mc2: e.target.value } : b))}
+                          placeholder="MC2"
+                          className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1.5 text-app-text font-inter text-sm focus:outline-none focus:border-primary/50 min-w-0"
+                        />
+                        <select
+                          value={eb.format}
+                          onChange={e => setEditBattles(prev => prev.map((b, i) => i === idx ? { ...b, format: e.target.value } : b))}
+                          className="bg-white/5 border border-white/10 rounded px-1.5 py-1.5 text-app-text font-inter text-xs focus:outline-none focus:border-primary/50 flex-shrink-0"
+                        >
+                          <option value="1v1">1v1</option>
+                          <option value="2v2">2v2</option>
+                        </select>
+                        <button
+                          onClick={() => deleteBattle(eb.id, idx, eb.hasScores)}
+                          className="text-red-400/60 hover:text-red-400 text-base px-1.5 py-1 flex-shrink-0 active:scale-95 transition-all leading-none"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={addBattle}
+                    className="w-full card border-secondary/20 rounded-lg py-2 font-bebas text-secondary tracking-[1px] text-sm active:scale-95 transition-transform"
+                  >
+                    + Battle hinzufügen
+                  </button>
+                </>
+              )}
+            </div>
+
+            {editError && (
+              <p className="font-inter text-red-400 text-xs">{editError}</p>
+            )}
+
             <div className="flex gap-2 mt-1">
-              <button onClick={() => setEditingEvent(null)}
+              <button onClick={closeModal}
                 className="flex-1 card rounded-lg py-3 font-bebas text-app-muted tracking-[1px] text-sm active:scale-95 transition-transform">
                 Abbrechen
               </button>
