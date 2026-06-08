@@ -429,7 +429,7 @@ function BattleView({
 
 // ── Hauptkomponente ───────────────────────────────────────────────────────────
 export default function Reveal() {
-  const { roomId, eventId } = useParams<{ roomId: string; eventId: string }>()
+  const { roomId, eventId, battleId } = useParams<{ roomId: string; eventId: string; battleId?: string }>()
   const { profile } = useAuth()
   const navigate = useNavigate()
   const displayName = profile?.display_name ?? ''
@@ -474,10 +474,17 @@ export default function Reveal() {
           supabase.from('battle_verdicts').select('*').in('battle_id', ids),
         ])
 
-        const myVerdictCount = (allVerdicts ?? []).filter((v: BattleVerdict) => v.user_name === displayName).length
-        setUserHasVoted(ids.length === 0 || myVerdictCount === ids.length)
+        // Single-battle mode: only require my vote on the target battle
+        const relevantIds = battleId ? ids.filter(id => id === battleId) : ids
+        const myVerdictCount = (allVerdicts ?? [])
+          .filter((v: BattleVerdict) => v.user_name === displayName && relevantIds.includes(v.battle_id)).length
+        setUserHasVoted(relevantIds.length === 0 || myVerdictCount === relevantIds.length)
 
-        const revealData: BattleReveal[] = (battles ?? []).map((battle: Battle) => {
+        const allBattles = battleId
+          ? (battles ?? []).filter((b: Battle) => b.id === battleId)
+          : (battles ?? [])
+
+        const revealData: BattleReveal[] = allBattles.map((battle: Battle) => {
           const bScores: Score[] = (allScores ?? []).filter((s: Score) => s.battle_id === battle.id)
           const bVerdicts: BattleVerdict[] = (allVerdicts ?? []).filter((v: BattleVerdict) => v.battle_id === battle.id)
           const allNames = [...new Set(bVerdicts.map((v: BattleVerdict) => v.user_name))]

@@ -253,9 +253,9 @@ export default function BattleOverview() {
             <button key={b.id}
               onClick={() => {
                 if (!votingAllowed) return
-                // State 3: another user has voted on this battle → go to reveal (frozen)
+                // State 3: another user has voted on this battle → per-battle reveal (frozen)
                 if (mySaved && otherDone) {
-                  navigate(`/room/${roomId}/reveal/${eventId}`)
+                  navigate(`/room/${roomId}/reveal/${eventId}/${b.id}`)
                 } else {
                   setActiveBattleId(b.id)
                 }
@@ -284,7 +284,7 @@ export default function BattleOverview() {
                   ) : (
                     <>
                       {statusVariant === 'reveal' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-secondary/20 text-secondary">🔓 Reveal</span>}
-                      {statusVariant === 'saved' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-green-900/30 text-green-400">✓ Bewertet</span>}
+                      {statusVariant === 'saved' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-white/10 text-app-muted">⏳ Wartet auf andere</span>}
                       {statusVariant === 'my_turn' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-accent/20 text-accent animate-pulse">⚡ Nur noch du</span>}
                       {statusVariant === 'pending' && <span className="font-inter text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-[0.1em] flex-shrink-0 bg-primary/20 text-primary">Ausstehend</span>}
                     </>

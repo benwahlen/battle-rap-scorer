@@ -68,6 +68,7 @@ function AppRoutes() {
       <Route path="/room/:roomId/score/:eventId" element={<BattleOverview />} />
       <Route path="/room/:roomId/wait/:eventId" element={<WaitScreen />} />
       <Route path="/room/:roomId/reveal/:eventId" element={<Reveal />} />
+      <Route path="/room/:roomId/reveal/:eventId/:battleId" element={<Reveal />} />
       <Route path="/join/:inviteCode" element={<JoinRoom />} />
       <Route path="/profile" element={<ProfileScreen />} />
       <Route path="/event-pool/:roomId" element={<EventPool />} />
